@@ -1,0 +1,8 @@
+{
+  "name": "نظام سندات الصيانة - SND",
+  "description": "نظام متكامل لإدارة مراكز صيانة الأجهزة والشبكات والراوترات. تتبع الأجهزة، فواتير صيانة، تقارير أداء، وإدارة عملاء.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

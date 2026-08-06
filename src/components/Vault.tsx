@@ -1,0 +1,3770 @@
+import { sharePdfFile, openWhatsApp, sendUniversalReminder } from '../lib/shareHelper';
+import PrintPreviewOverlay from './PrintPreviewOverlay';
+import { tafqeet } from '../lib/tafqeet';
+import React, { useEffect, useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useTranslation } from 'react-i18next';
+import { localDb } from '../lib/local-db';
+import { ProviderFactory } from '../data/ProviderFactory';
+import { User, ShopConfig } from '../types';
+import { useBackHandler } from '../hooks/useBackHandler';
+import { usePermissions } from '../hooks/usePermissions';
+import BankAccountsFooter from './BankAccountsFooter';
+import { parseDate, formatDateTime, parseTxDate, formatTxDate } from '../lib/dateUtils';
+import { 
+  CircleDollarSign,
+  X,
+  Calendar,
+  User as UserIcon,
+  Tag,
+  CheckCircle2,
+  ArrowRight,
+  ArrowRightLeft,
+  TrendingUp,
+  TrendingDown,
+  Percent,
+  TrendingUp as ProfitIcon,
+  Search,
+  Plus,
+  Bookmark,
+  ChevronLeft,
+  Filter,
+  Layers,
+  FileSpreadsheet,
+  Users,
+  Wallet,
+  Coins,
+  FileText,
+  Printer,
+  ArrowLeft,
+  LogOut,
+  Phone,
+  Smartphone,
+  MessageCircle,
+  Facebook,
+  MapPin,
+  BarChart,
+  PieChart,
+  Activity,
+  LineChart,
+  Eye,
+  Check,
+  ArrowUpDown,
+  Save,
+  Loader2
+} from 'lucide-react';
+import jsPDF from 'jspdf';
+import * as htmlToImage from 'html-to-image';
+import { sanitizeDocumentStyles, sanitizeElementInlineStyles, cleanOklchInStyleText } from '../lib/html2canvasHelper';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { doc, getDoc, db, setDoc, collection, addDoc } from '../firebase';
+
+interface VaultTransaction {
+  linkedTxId?: string;
+  id: string;
+  currency: string;
+  amount: number;
+  customerName: string;
+  invoiceNumber: string;
+  userName: string;
+  userNumber?: number;
+  userId?: string;
+  timestamp: string; // ISO string
+  type: 'receipt' | 'payment';
+  notes: string;
+  updatedAt?: string;
+  voucherNumber: number;
+  transactionCategory: string;
+  fundId: string;
+  fundName: string;
+  customerId?: string;
+  isReversed?: number | boolean;
+  isReversal?: number | boolean;
+  reversalOf?: string;
+  status?: string;
+  paymentType?: number;
+  liabilityCurrency?: string;
+  liabilityAmount?: number;
+  receiptCurrency?: string;
+  receiptAmount?: number;
+  bankDetails?: string;
+}
+
+interface FinFund {
+  id: string;
+  name: string;
+  type: string;
+  currency: string;
+  description: string;
+  status: string;
+  balance: number;
+}
+
+interface FinCurrency {
+  id: string;
+  name: string;
+  symbol: string;
+  decimals: number;
+  status: string;
+}
+
+interface FinTransactionType {
+  id: string;
+  name: string;
+  type: 'receipt' | 'payment';
+}
+
+interface DB_Customer {
+  id: string;
+  name: string;
+  companyName?: string;
+  phone1?: string;
+}
+
+interface DB_Invoice {
+  id: string;
+  invoiceNumber: string;
+  customerId: string;
+  customerName: string;
+  currency: string;
+  totalCost: number;
+  amountPaid: number;
+  status: string;
+  createdAt: string;
+}
+
+const WhatsAppIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M12.012 2c-5.506 0-9.978 4.471-9.978 9.978 0 1.764.459 3.42 1.258 4.873L2 22l5.312-1.393c1.405.766 3 1.18 4.7 1.18 5.506 0 9.978-4.472 9.978-9.978C21.99 6.471 17.518 2 12.012 2zm6.331 14.161c-.244.686-1.22 1.258-1.687 1.341-.468.084-.935.152-2.903-.631-2.479-.982-4.053-3.522-4.175-3.69-.122-.167-.991-1.319-.991-2.518 0-1.199.631-1.787.854-2.028.223-.241.488-.302.65-.302.162 0 .325.003.467.01.147.007.345-.057.545.421.203.488.691 1.687.752 1.809.061.122.102.264.02.427-.081.162-.122.264-.244.407-.122.142-.256.319-.366.427-.122.122-.249.255-.107.498.142.244.631 1.036 1.354 1.678.932.827 1.714 1.082 1.957 1.204.244.122.386.102.528-.061.142-.162.61-2.008.772-2.313.162-.305.325-.244.548-.162.223.081 1.423.671 1.667.793.244.122.406.183.467.284.061.104.061.59-.183 1.277z" />
+  </svg>
+);
+
+const DashboardButton = ({ onClick, icon, label, description, color, bg }: { onClick: () => void; icon: React.ReactNode; label: string; description: string; color: string; bg: string }) => (
+  <button 
+    onClick={onClick}
+    className="group w-full flex items-center gap-6 p-5 bg-[#181818] border border-white/5 rounded-2xl hover:border-amber-500/50 hover:bg-[#1c1c1c] transition-all relative overflow-hidden active:scale-[0.98]"
+  >
+    <div className={`p-3 rounded-xl ${bg} ${color} group-hover:scale-110 transition-transform duration-500`}>
+      {React.cloneElement(icon as React.ReactElement, { size: 28 })}
+    </div>
+    <div className="flex flex-col text-right">
+      <span className="text-base font-black text-white font-cairo">{label}</span>
+      <span className="text-xs text-gray-500 font-cairo">{description}</span>
+    </div>
+    <div className="mr-auto opacity-0 group-hover:opacity-100 transition-opacity">
+      <ArrowLeft size={20} className={color} />
+    </div>
+  </button>
+);
+
+export default function Vault({ user, shopConfig, onBack }: { user: User; shopConfig: ShopConfig | null; onBack: () => void }) {
+  const { t, i18n } = useTranslation();
+  const { hasPermission, canAdd, canEdit, canDelete, canPrint } = usePermissions(user, 'vault');
+
+  if (!hasPermission('view')) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
+        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center text-red-500">
+          <CircleDollarSign size={32} />
+        </div>
+        <h2 className="text-xl font-bold text-white">عذراً، ليس لديك صلاحية الوصول</h2>
+        <p className="text-gray-400 max-w-md">يرجى التواصل مع المسؤول للحصول على الصلاحيات اللازمة لعرض الحسابات.</p>
+        <button 
+          onClick={onBack} 
+          className="p-2.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl transition-all border border-white/5 flex items-center justify-center"
+          title="خروج للرئيسية"
+        >
+          <LogOut size={20} className="rotate-180" />
+        </button>
+      </div>
+    );
+  }
+  // Navigation
+  const [activeSegment, setActiveSegment] = useState<'dashboard' | 'receipt' | 'payment' | 'transfer' | 'funds' | 'customer-ledger' | 'reports'>('dashboard');
+  const [reportSubSegment, setReportSubSegment] = useState<'revenues' | 'expenses' | 'profits' | 'fund-balances' | 'outstanding-debts'>('revenues');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
+  const [previewData, setPreviewData] = useState<{ type: 'invoice' | 'voucher' | 'statement' | 'table'; data: any } | null>(null);
+  const [reversalTxToConfirm, setReversalTxToConfirm] = useState<VaultTransaction | null>(null);
+
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  
+  const [voucherSortConfig, setVoucherSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
+  const [showVoucherSort, setShowVoucherSort] = useState(false);
+  const [showFundTxSort, setShowFundTxSort] = useState(false);
+
+  // CUSTOMER LEDGER TAB STATES
+  const [ledgerCustomerId, setLedgerCustomerId] = useState<string>('');
+  const [ledgerCurrency, setLedgerCurrency] = useState<string>('USD');
+  const [ledgerSearchTerm, setLedgerSearchTerm] = useState<string>('');
+
+  const [isLedgerModalOpen, setIsLedgerModalOpen] = useState<boolean>(false);
+  const [ledgerModalTab, setLedgerModalTab] = useState<'invoices' | 'transactions'>('invoices');
+  const [ledgerListPage, setLedgerListPage] = useState<number>(1);
+
+  // Database lists
+  const [funds, setFunds] = useState<FinFund[]>([]);
+  const [currencies, setCurrencies] = useState<FinCurrency[]>([]);
+  const [txTypes, setTxTypes] = useState<FinTransactionType[]>([]);
+  const [customers, setCustomers] = useState<DB_Customer[]>([]);
+  const [invoices, setInvoices] = useState<DB_Invoice[]>([]);
+  const [items, setItems] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<VaultTransaction[]>([]);
+
+  const sortedTransactions = useMemo(() => {
+    let sorted = [...transactions];
+    sorted.sort((a, b) => {
+      let valA: any = '';
+      let valB: any = '';
+
+      switch (voucherSortConfig.key) {
+        case 'voucherNumber':
+          valA = a.voucherNumber;
+          valB = b.voucherNumber;
+          break;
+        case 'alpha':
+          valA = a.customerName || '';
+          valB = b.customerName || '';
+          break;
+        case 'category':
+          valA = a.transactionCategory || '';
+          valB = b.transactionCategory || '';
+          break;
+        case 'amount':
+          valA = Math.abs(Number(a.amount || 0));
+          valB = Math.abs(Number(b.amount || 0));
+          break;
+        case 'date':
+        default:
+          valA = (a.timestamp || a.updatedAt) ? new Date(a.timestamp || a.updatedAt || 0).getTime() : 0;
+          valB = (b.timestamp || b.updatedAt) ? new Date(b.timestamp || b.updatedAt || 0).getTime() : 0;
+          break;
+      }
+
+      if (valA < valB) return voucherSortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return voucherSortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [transactions, voucherSortConfig]);
+
+  useBackHandler(reversalTxToConfirm !== null, () => setReversalTxToConfirm(null));
+  useBackHandler(showPrintPreview, () => setShowPrintPreview(false));
+  useBackHandler(showAddModal, () => setShowAddModal(false));
+  useBackHandler(isLedgerModalOpen, () => setIsLedgerModalOpen(false));
+  useBackHandler(activeSegment !== 'dashboard' && !showAddModal && !showPrintPreview && !reversalTxToConfirm && !isLedgerModalOpen, () => setActiveSegment('dashboard'));
+
+  // LEDGER CUSTOMER MATH & HELPERS
+  const getInvoiceItemsForInvoice = (invoiceNumber: string) => {
+    return items.filter(it => it.invoiceNumber === invoiceNumber);
+  };
+
+  const getInvoiceActualCost = (invoiceItems: any[], invoice?: any) => {
+    return invoiceItems.reduce((sum, item) => {
+      if (['10', '20', '25', '30', '35', '40', 'new', 'in_progress', 'awaiting_parts', 'awaiting_approval', 'repairing'].includes(item.status)) {
+        return sum;
+      }
+      const sub = (item.subStatus || '').toLowerCase();
+      const status = (item.status || '').toLowerCase();
+      const src = (item.source || '').toLowerCase();
+      const isExcluded = 
+        ['70', 'cancelled', 'refused', 'unrepairable', 'parts_not_available', 'failed'].includes(status) ||
+        ['cancelled', 'refused', 'unrepairable', 'parts_not_available', 'failed'].includes(sub) ||
+        ['cancelled', 'refused', 'unrepairable', 'parts_not_available', 'failed'].includes(src) ||
+        (item.failureReason !== null && item.failureReason !== undefined && item.failureReason !== '');
+      if (isExcluded) return sum;
+      return sum + (Number(item.cost) || 0);
+    }, 0) - (invoice ? Number(invoice.discount || 0) : 0) + (invoice ? Number(invoice.tax || 0) : 0);
+  };
+
+  const ledgerCustomerInvoices = invoices.filter(inv => inv.customerId === ledgerCustomerId && (inv.currency || 'USD') === ledgerCurrency);
+  const ledgerCustomerTransactions = transactions.filter(tx => tx.customerId === ledgerCustomerId && (tx.currency || 'USD') === ledgerCurrency);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeSegment, globalSearch, ledgerSearchTerm]);
+  
+  const filteredVaultTransactions = sortedTransactions.filter(tx => 
+    tx.customerName.toLowerCase().includes(globalSearch.toLowerCase()) || 
+    tx.fundName?.toLowerCase().includes(globalSearch.toLowerCase())
+  );
+  const totalVaultPages = Math.max(1, Math.ceil(filteredVaultTransactions.length / itemsPerPage));
+  const safeVaultCurrentPage = Math.min(currentPage, totalVaultPages);
+  const currentVaultTransactions = filteredVaultTransactions.slice((safeVaultCurrentPage - 1) * itemsPerPage, safeVaultCurrentPage * itemsPerPage);
+
+  const totalLedgerInvoicesPages = Math.max(1, Math.ceil(ledgerCustomerInvoices.length / itemsPerPage));
+  const safeLedgerInvoicesPage = Math.min(currentPage, totalLedgerInvoicesPages);
+  const currentLedgerInvoices = ledgerCustomerInvoices.slice((safeLedgerInvoicesPage - 1) * itemsPerPage, safeLedgerInvoicesPage * itemsPerPage);
+
+  const totalLedgerTransactionsPages = Math.max(1, Math.ceil(ledgerCustomerTransactions.length / itemsPerPage));
+  const safeLedgerTransactionsPage = Math.min(currentPage, totalLedgerTransactionsPages);
+  const currentLedgerTransactions = ledgerCustomerTransactions.slice((safeLedgerTransactionsPage - 1) * itemsPerPage, safeLedgerTransactionsPage * itemsPerPage);
+
+  // Page level stats
+  const [loading, setLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // VOUCHER FORM STATES (Shared structure)
+  const [nextVoucherNum, setNextVoucherNum] = useState<number>(1001);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [customerSearch, setCustomerSearch] = useState<string>('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('');
+  const [voucherAmount, setVoucherAmount] = useState<string>('');
+  const [voucherNotes, setVoucherNotes] = useState<string>('');
+  const [selectedFundId, setSelectedFundId] = useState<string>('');
+  const [referenceNumber, setReferenceNumber] = useState<string>('');
+  const [depositorName, setDepositorName] = useState<string>('');
+    const [liabilityCurrency, setLiabilityCurrency] = useState<string>('USD');
+  const [liabilityAmount, setLiabilityAmount] = useState<string>('');
+  
+  // EXCHANGE RATE STATES
+  const [voucherExchangeRate, setVoucherExchangeRate] = useState<string>('1');
+
+  // TRANSFER TAB STATES
+  const [transferSourceFundId, setTransferSourceFundId] = useState<string>('');
+  const [transferDestFundId, setTransferDestFundId] = useState<string>('');
+  const [transferAmount, setTransferAmount] = useState<string>('');
+  const [transferNotes, setTransferNotes] = useState<string>('');
+  
+  const [transferExchangeRate, setTransferExchangeRate] = useState<string>('1');
+
+  const getFundDisplayName = (tx: any) => {
+    if (tx.fundName && tx.fundName.trim() && tx.fundName !== 'غير معروف') return tx.fundName;
+    if (tx.fundId) {
+      const matched = funds.find(f => f.id === tx.fundId);
+      if (matched && matched.name) return matched.name;
+    }
+    if (tx.paymentType === 2) return 'حساب بنكي';
+    if (tx.paymentType === 1) return 'الخزينة الرئيسية';
+    return 'الخزينة الرئيسية';
+  };
+
+  const getCustomerCurrencyLabel = (customerId: string) => {
+    const customerInvs = invoices.filter(inv => inv.customerId === customerId);
+    const currencies = Array.from(new Set(customerInvs.map(inv => inv.currency || 'USD')));
+    if (currencies.length === 0) return 'USD';
+    return currencies.join(' / ');
+  };
+
+  const getArabicCurrencyName = (currCode: string) => {
+    if (!currCode) return 'دولار';
+    if (currCode.toUpperCase() === 'USD') return 'دولار';
+    if (currCode.toUpperCase() === 'YER') return 'ريال يمني';
+    if (currCode.toUpperCase().includes('USD') && currCode.toUpperCase().includes('YER')) return 'دولار / ريال يمني';
+    return currCode;
+  };
+
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
+  const [currentOutput, setCurrentOutput] = useState<any>(null);
+
+  // Fetch all core data from local implementation
+  const loadDatabaseData = async () => {
+    setLoading(true);
+    try {
+      // 1. Funds
+      const fundsRes = await localDb.query("SELECT * FROM fin_funds ORDER BY name ASC");
+      let activeFunds = (fundsRes.values || []).filter((f: any) => f.status === 'active') as FinFund[];
+      if (activeFunds.length === 0 && fundsRes.values && fundsRes.values.length > 0) {
+        activeFunds = fundsRes.values as FinFund[];
+      }
+      setFunds(activeFunds);
+
+      // 2. Currencies
+      const currRes = await localDb.query("SELECT * FROM fin_currencies WHERE status = 'active' ORDER BY name ASC");
+      const activeCurrs = (currRes.values || []) as FinCurrency[];
+      setCurrencies(activeCurrs);
+
+      // 3. Types
+      const typesRes = await localDb.query("SELECT * FROM fin_transaction_types ORDER BY name ASC");
+      setTxTypes((typesRes.values || []) as FinTransactionType[]);
+
+      // 4. Customers
+      const custRes = await localDb.query("SELECT id, name, companyName, phone1, liabilityCurrency FROM customers ORDER BY name ASC");
+      setCustomers((custRes.values || []) as DB_Customer[]);
+
+      // 5. Invoices
+      const invRes = await localDb.query("SELECT id, invoiceNumber, customerId, customerName, currency, totalCost, amountPaid, status, createdAt FROM invoices");
+      setInvoices((invRes.values || []) as DB_Invoice[]);
+
+      // 5.5. Invoice Items
+      const itemsRes = await localDb.query("SELECT * FROM invoice_items");
+      setItems(itemsRes.values || []);
+
+      // 6. Transactions
+      const txRes = await localDb.query("SELECT * FROM vault_transactions ORDER BY timestamp DESC");
+      setTransactions((txRes.values || []) as VaultTransaction[]);
+
+      // Reset Form defaults when data shifts
+      if (activeFunds.length > 0 && !selectedFundId) {
+        setSelectedFundId(activeFunds[0].id);
+      }
+      if (activeCurrs.length > 0 && !selectedCurrency) {
+        setSelectedCurrency(activeCurrs[0].name);
+      }
+
+    } catch (err: any) {
+      console.error('Error loading vault data:', err);
+      setErrorMsg('فشل تحميل حسابات الخزينة');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Run initial fetch
+  useEffect(() => {
+    loadDatabaseData();
+    const fetchShopConfig = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'company_details', 'main_details'));
+        if (snap.exists()) {
+          // setShopConfig(snap.data() as any);
+        } else {
+          // Fallback to SQLite
+          const localRes = await localDb.query("SELECT * FROM company_details LIMIT 1");
+          if (localRes.values && localRes.values.length > 0) {
+            // setShopConfig(localRes.values[0]);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching shop config:", err);
+      }
+    };
+    fetchShopConfig();
+  }, []);
+
+  // Fetch & Calculate Next Voucher Index
+  const calculateNextVoucherNumber = async () => {
+    try {
+      const res = await localDb.query("SELECT COALESCE(MAX(voucherNumber), 1000) as maxNum FROM vault_transactions");
+      const max = res.values?.[0]?.maxNum || 1000;
+      setNextVoucherNum(Number(max) + 1);
+    } catch (err) {
+      setNextVoucherNum(1001);
+    }
+  };
+
+  const resetForm = () => {
+    // 1. Reset Voucher States
+    setSelectedCategory('');
+    setCustomerSearch('');
+    setSelectedCustomerId('');
+    setShowCustomerDropdown(false);
+    setSelectedCurrency('');
+    setVoucherAmount('');
+    setVoucherNotes('');
+    setSelectedFundId('');
+    setReferenceNumber('');
+    setDepositorName('');
+    setLiabilityCurrency('USD');
+    setLiabilityAmount('');
+    setVoucherExchangeRate('1');
+
+    // 2. Reset Transfer States
+    setTransferSourceFundId('');
+    setTransferDestFundId('');
+    setTransferAmount('');
+    setTransferNotes('');
+    setTransferExchangeRate('1');
+
+    // 3. Clear messages/preview
+    setErrorMsg(null);
+    setShowPrintPreview(false);
+  };
+
+  // Recalculate voucher number whenever segment changes or txTypes are loaded
+  useEffect(() => {
+    calculateNextVoucherNumber();
+    // Default the category selection to the first available category of the current voucher type
+    const matchingCats = txTypes.filter(cat => cat.type === activeSegment);
+    resetForm();
+    setSelectedCategory(matchingCats[0]?.name || '');
+    setShowAddModal(false);
+  }, [activeSegment, txTypes]);
+
+  // Sync liabilityCurrency when customerSearch changes
+  useEffect(() => {
+    const trimmed = customerSearch.trim();
+    if (!trimmed) {
+      setLiabilityCurrency('USD');
+      return;
+    }
+    const matched = customers.find(c => c.name.trim().toLowerCase() === trimmed.toLowerCase());
+    if (matched) {
+      setLiabilityCurrency(matched.liabilityCurrency || 'USD');
+    } else {
+      setLiabilityCurrency('USD');
+    }
+  }, [customerSearch, customers]);
+
+  
+  // Automatically set default exchange rate to 3.8 if SAR is involved
+  useEffect(() => {
+    if (selectedCurrency && liabilityCurrency && selectedCurrency !== liabilityCurrency) {
+      if ((selectedCurrency === 'SAR' && liabilityCurrency === 'USD') || (selectedCurrency === 'USD' && liabilityCurrency === 'SAR')) {
+        setVoucherExchangeRate('3.8');
+      } else {
+        setVoucherExchangeRate('1');
+      }
+    } else {
+      setVoucherExchangeRate('1');
+    }
+  }, [selectedCurrency, liabilityCurrency]);
+
+  useEffect(() => {
+    const src = funds.find(f => f.id === transferSourceFundId);
+    const dest = funds.find(f => f.id === transferDestFundId);
+    if (src && dest && src.currency !== dest.currency) {
+      if ((src.currency === 'SAR' && dest.currency === 'USD') || (src.currency === 'USD' && dest.currency === 'SAR')) {
+        setTransferExchangeRate('3.8');
+      } else {
+        setTransferExchangeRate('1');
+      }
+    } else {
+      setTransferExchangeRate('1');
+    }
+  }, [transferSourceFundId, transferDestFundId, funds]);
+
+  // Synchronize currency automatically with selected fund
+  useEffect(() => {
+    if (selectedFundId && funds.length > 0) {
+      const fund = funds.find(f => f.id === selectedFundId);
+      if (fund) {
+        setSelectedCurrency(fund.currency);
+      }
+    }
+  }, [selectedFundId, funds]);
+
+  
+  useEffect(() => {
+    setVoucherAmount('');
+    setVoucherNotes('');
+    setDepositorName('');
+    setReferenceNumber('');
+  }, [selectedFundId, liabilityCurrency]);
+
+  useEffect(() => {
+    setTransferAmount('');
+    setTransferNotes('');
+  }, [transferSourceFundId, transferDestFundId]);
+
+  // Form Validity check
+  const isFormValid = () => {
+    if (!selectedFundId) return false;
+    if (!voucherAmount || !voucherAmount.trim()) return false;
+    const amountVal = parseFloat(voucherAmount);
+    if (isNaN(amountVal) || amountVal <= 0) return false;
+    
+
+
+    if (!customerSearch || !customerSearch.trim()) return false;
+    if (!selectedCategory || !selectedCategory.trim()) return false;
+
+    // Additional checks for bank fund mode
+    const matchedFund = funds.find(f => f.id === selectedFundId);
+    if (matchedFund && matchedFund.type !== 'cash') {
+      if (!referenceNumber || !referenceNumber.trim()) return false;
+      if (!depositorName || !depositorName.trim()) return false;
+    }
+
+    return true;
+  };
+
+  // Handle smooth scroll on focus for mobile devices
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const target = e.target;
+    setTimeout(() => {
+      if (target && typeof target.scrollIntoView === 'function') {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 300);
+  };
+
+  // Handle saving and exporting voucher
+  const handleSaveFinalVoucher = async (e: React.FormEvent, action: 'commit' | 'print' | 'whatsapp') => {
+    e.preventDefault();
+    if (!isFormValid() || isPosting) return;
+
+    if (action === 'print' || action === 'whatsapp') {
+      const originalStyle = document.createElement('style');
+      originalStyle.innerHTML = `
+        @media print {
+          @page { size: auto; margin: 0; }
+          body * { visibility: hidden !important; }
+          #print-area, #print-area * { visibility: visible !important; }
+          #print-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 10mm !important;
+            color: #000000 !important;
+            background-color: #ffffff !important;
+          }
+        }
+      `;
+
+      if (action === 'print') {
+        document.head.appendChild(originalStyle);
+        window.print();
+        document.head.removeChild(originalStyle);
+      } else if (action === 'whatsapp') {
+        setIsPosting(true);
+        const element = document.getElementById('print-area');
+        if (element) {
+          const originalGetComputedStyle = window.getComputedStyle;
+          let tempEl: HTMLDivElement | null = null;
+          let restore: (() => void) | null = null;
+          try {
+            tempEl = document.createElement('div');
+            tempEl.style.display = 'none';
+            document.body.appendChild(tempEl);
+
+            const convertToRgb = (color: string) => {
+              if (!color || (!color.includes('oklch') && !color.includes('oklab'))) return color;
+              try {
+                if (!tempEl) return 'rgb(0, 0, 0)';
+                tempEl.style.color = '';
+                tempEl.style.color = color;
+                const rgb = originalGetComputedStyle.call(window, tempEl).color;
+                if (rgb && !rgb.includes('oklch') && !rgb.includes('oklab')) {
+                  return rgb;
+                }
+                return 'rgb(0, 0, 0)';
+              } catch (err) {
+                return 'rgb(0, 0, 0)';
+              }
+            };
+
+            const customGetComputedStyle = (el: Element, pseudoElt?: string | null) => {
+              const style = originalGetComputedStyle.call(window, el, pseudoElt);
+              return new Proxy(style, {
+                get(target: any, prop: string) {
+                  const val = target[prop];
+                  if (typeof val === 'string' && (val.includes('oklch') || val.includes('oklab'))) {
+                    return convertToRgb(val);
+                  }
+                  if (typeof val === 'function') {
+                    return function(...args: any[]) {
+                      const res = val.apply(target, args);
+                      if (typeof res === 'string' && (res.includes('oklch') || res.includes('oklab'))) {
+                        return convertToRgb(res);
+                      }
+                      return res;
+                    };
+                  }
+                  return val;
+                }
+              });
+            };
+
+            window.getComputedStyle = customGetComputedStyle as any;
+
+            restore = await sanitizeDocumentStyles();
+            sanitizeElementInlineStyles(element);
+
+            let clonedAreaHeight = 842;
+            const canvas = await htmlToImage.toCanvas(element, {
+              pixelRatio: 2,
+              backgroundColor: '#ffffff',
+            });
+
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4',
+                compress: true
+              });
+
+              const pdfWidth = pdf.internal.pageSize.getWidth();
+              const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+              let heightLeft = pdfHeight;
+              let position = 0;
+
+              pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight, undefined, 'FAST');
+              heightLeft -= pdf.internal.pageSize.getHeight();
+
+              while (heightLeft > 0.5) {
+                position = heightLeft - pdfHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight, undefined, 'FAST');
+                heightLeft -= pdf.internal.pageSize.getHeight();
+              }
+            
+            const formattedDate = new Date().toISOString().split('T')[0];
+            const custName = customers.find(c => c.id === selectedCustomerId)?.name || customerSearch || 'عام';
+            const reportName = activeSegment === 'receipt' ? 'سند قبض' : 'سند صرف';
+            const filename = `${reportName}_${custName}_${formattedDate}.pdf`;
+            pdf.save(filename);
+
+            const customerPhone = customers.find(c => c.id === selectedCustomerId || c.name === customerSearch)?.phone1 || '';
+            const text = `السلام عليكم ورحمة الله وبركاته...
+مرفق لكم تفاصيل سند ${activeSegment === 'receipt' ? 'قبض' : 'صرف'} رقم (${nextVoucherNum}):
+نوع السند: ${activeSegment === 'receipt' ? 'سند قبض مالي' : 'سند صرف مالي'}
+العميل: ${customerSearch}
+المبلغ: ${voucherAmount} ${selectedCurrency}
+التصنيف: ${selectedCategory}
+الملاحظات: ${voucherNotes || 'لا يوجد'}
+شكراً لتعاملكم معنا.`;
+
+            let sharedNatively = false;
+            if (navigator.share && navigator.canShare) {
+              const pdfBlob = pdf.output('blob');
+              const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+              if (navigator.canShare({ files: [file] })) {
+                 await navigator.share({ files: [file], title: filename, text: text });
+                 sharedNatively = true;
+              }
+            }
+            if (!sharedNatively) {
+              openWhatsApp(text, customerPhone);
+            }
+          } catch (err) {
+            console.error('Failed to generate or share PDF', err);
+          } finally {
+            if (restore) restore();
+            window.getComputedStyle = originalGetComputedStyle;
+            if (tempEl && tempEl.parentNode) {
+              tempEl.parentNode.removeChild(tempEl);
+            }
+            setIsPosting(false);
+          }
+        }
+      }
+    }
+
+    // Now proceed with normal post logic
+    await handlePostVoucher(e);
+  };
+
+  // POST / REASSIGN Voucher to Ledger
+  const handlePostVoucher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isFormValid() || isPosting) return;
+
+    setIsPosting(true);
+    try {
+      const isReceipt = activeSegment === 'receipt';
+      const parsedAmount = parseFloat(voucherAmount);
+      const matchedFund = funds.find(f => f.id === selectedFundId);
+      if (!matchedFund) {
+        setErrorMsg('الصندوق المحدد غير موجود');
+        setIsPosting(false);
+        return;
+      }
+
+      const txId = `vtx-${Math.random().toString(36).substring(2, 8)}`;
+      const timestampIso = new Date().toISOString();
+
+      let computedLiabilityAmount = parsedAmount;
+      let finalVoucherNotes = voucherNotes.trim();
+      let customerStatementNote = '';
+
+      if (liabilityCurrency && liabilityCurrency !== selectedCurrency) {
+        const vRate = parseFloat(voucherExchangeRate) || 1;
+        computedLiabilityAmount = vRate > 0 ? Math.round((parsedAmount / vRate) * 100) / 100 : 0;
+        finalVoucherNotes += ` [سعر الصرف: ${vRate} لعملة ${liabilityCurrency} مقابل ${selectedCurrency}]`;
+      } else {
+        computedLiabilityAmount = parsedAmount;
+      }
+      
+      const statementKeyword = isReceipt ? 'لكم' : 'عليكم';
+      const currencyNameText = currencies.find(c => c.name === liabilityCurrency)?.name || liabilityCurrency || '';
+      customerStatementNote = `${voucherNotes.trim()} ${statementKeyword} مبلغ ${tafqeet(computedLiabilityAmount)} ${currencyNameText} مقابل ${selectedCategory}`;
+
+
+
+      const finalLiabilityCurrency = liabilityCurrency || selectedCurrency;
+      const finalLiabilityAmount = computedLiabilityAmount;
+      const finalPaymentType = (liabilityCurrency && liabilityCurrency !== selectedCurrency) ? 2 : 1;
+      const finalReceiptCurrency = selectedCurrency;
+      const finalReceiptAmount = parsedAmount;
+      const finalBankDetails = matchedFund.type !== 'cash' ? { referenceNumber: referenceNumber.trim(), depositorName: depositorName.trim() } : {};
+
+      // Ensure statementNote column exists (hot-reload safety)
+      try {
+        await localDb.run('ALTER TABLE vault_transactions ADD COLUMN statementNote TEXT');
+      } catch (e) {}
+
+
+      // 1. Insert into database
+      const txData1 = {
+        id: txId, currency: selectedCurrency, amount: isReceipt ? parsedAmount : -parsedAmount, customerName: customerSearch.trim() || 'جهة عامة أخرى', invoiceNumber: '',
+        userName: user.name || 'المدير العام', userNumber: user.userNumber || 1, userId: user.id || 'none', timestamp: timestampIso, type: isReceipt ? 'receipt' : 'payment',
+        notes: matchedFund.type !== 'cash' ? `رقم المرجع: ${referenceNumber.trim()} | المودع: ${depositorName.trim()} | الملاحظات: ${finalVoucherNotes}` : finalVoucherNotes,
+        updatedAt: timestampIso, voucherNumber: nextVoucherNum, transactionCategory: selectedCategory, fundId: matchedFund.id, fundName: matchedFund.name,
+        customerId: selectedCustomerId || '', isReversed: 0, isReversal: 0, reversalOf: '', paymentType: finalPaymentType, liabilityCurrency: finalLiabilityCurrency,
+        liabilityAmount: finalLiabilityAmount, receiptCurrency: finalReceiptCurrency, receiptAmount: finalReceiptAmount, bankDetails: JSON.stringify(finalBankDetails), statementNote: customerStatementNote
+      };
+      await ProviderFactory.getProvider().setDoc('vault_transactions', txId, txData1);
+
+      // 2. Adjust target box fund balance in database
+      const balanceAdjustment = isReceipt ? parsedAmount : -parsedAmount;
+      await ProviderFactory.getProvider().updateDoc('fin_funds', matchedFund.id, { balance: { type: 'increment', value: balanceAdjustment } });
+
+      
+
+      // Successfully processed
+      setSuccessMsg(`تم ترحيل السند رقم (${nextVoucherNum}) بنجاح وتحديث الصناديق المال.`);
+      setTimeout(() => setSuccessMsg(null), 3000);
+      setShowAddModal(false);
+
+      resetForm();
+      
+      // Reload everything
+      await loadDatabaseData();
+      await calculateNextVoucherNumber();
+
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || 'فشل ترحيل قيد الحسابات');
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
+  const handlePostTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isPosting) return;
+    
+    if (!transferSourceFundId || !transferDestFundId || !transferAmount || parseFloat(transferAmount) <= 0) {
+      setErrorMsg('الرجاء تعبئة بيانات التحويل بشكل صحيح والمبلغ أكبر من صفر');
+      return;
+    }
+
+    if (transferSourceFundId === transferDestFundId) {
+      setErrorMsg('لا يمكن التحويل لنفس الصندوق');
+      return;
+    }
+
+    const sourceFund = funds.find(f => f.id === transferSourceFundId);
+    const destFund = funds.find(f => f.id === transferDestFundId);
+
+    if (!sourceFund || !destFund) {
+      setErrorMsg('أحد الصناديق غير موجود');
+      return;
+    }
+
+    if (sourceFund.currency !== destFund.currency) {
+      const rate = parseFloat(transferExchangeRate);
+      if (isNaN(rate) || rate <= 0) {
+        setErrorMsg('الرجاء إدخال سعر صرف صحيح أكبر من الصفر');
+        return;
+      }
+    }
+
+    setIsPosting(true);
+    try {
+      const parsedAmount = parseFloat(transferAmount);
+      const timestampIso = new Date().toISOString();
+
+      let destAmount = parsedAmount;
+      let finalTransferNotesSrc = transferNotes ? ' - ' + transferNotes : '';
+      let finalTransferNotesDest = transferNotes ? ' - ' + transferNotes : '';
+
+      if (sourceFund.currency !== destFund.currency) {
+        const rate = parseFloat(transferExchangeRate) || 1;
+        destAmount = rate > 0 ? Math.round((parsedAmount / rate) * 100) / 100 : 0;
+        
+        const rateNotes = ` [سعر الصرف: ${rate} لعملة ${sourceFund.currency} مقابل ${destFund.currency}]`;
+        finalTransferNotesSrc += rateNotes;
+        finalTransferNotesDest += rateNotes;
+      }
+
+      // Create transaction for Source (payment/outgoing)
+      const txIdOut = `vtx-${Math.random().toString(36).substring(2, 8)}`;
+      const txIdIn = `vtx-${Math.random().toString(36).substring(2, 8)}`;
+      await ProviderFactory.getProvider().setDoc('vault_transactions', txIdOut, {
+          linkedTxId: txIdIn,
+          id: txIdOut, currency: sourceFund.currency, amount: -parsedAmount, customerName: 'تحويل داخلي', invoiceNumber: '',
+          userName: user.name || 'المدير العام', userNumber: user.userNumber || 1, userId: user.id || 'none', timestamp: timestampIso, type: 'payment',
+          notes: `تحويل صادر إلى الصندوق: ${destFund.name}${finalTransferNotesSrc}`, updatedAt: timestampIso, voucherNumber: nextVoucherNum, transactionCategory: 'تحويل بين الصناديق',
+          fundId: sourceFund.id, fundName: sourceFund.name, customerId: ''
+      });
+
+      // Create transaction for Dest (receipt/incoming)
+      await ProviderFactory.getProvider().setDoc('vault_transactions', txIdIn, {
+          linkedTxId: txIdOut,
+          id: txIdIn, currency: destFund.currency, amount: destAmount, customerName: 'تحويل داخلي', invoiceNumber: '',
+          userName: user.name || 'المدير العام', userNumber: user.userNumber || 1, userId: user.id || 'none', timestamp: timestampIso, type: 'receipt',
+          notes: `تحويل وارد من الصندوق: ${sourceFund.name}${finalTransferNotesDest}`, updatedAt: timestampIso, voucherNumber: Number(nextVoucherNum) + 1, transactionCategory: 'تحويل بين الصناديق',
+          fundId: destFund.id, fundName: destFund.name, customerId: ''
+      });
+
+      // Adjust balances
+      await ProviderFactory.getProvider().updateDoc('fin_funds', sourceFund.id, { balance: { type: 'increment', value: -parsedAmount } });
+      await ProviderFactory.getProvider().updateDoc('fin_funds', destFund.id, { balance: { type: 'increment', value: destAmount } });
+
+      setSuccessMsg(`تم التحويل بنجاح من ${sourceFund.name} إلى ${destFund.name}`);
+      setTimeout(() => setSuccessMsg(null), 3000);
+      
+      resetForm();
+      
+      await loadDatabaseData();
+      await calculateNextVoucherNumber();
+
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || 'فشل عملية التحويل');
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
+  const handleReverseEntry = async (tx: VaultTransaction) => {
+    console.log("handleReverseEntry called", { tx, isPosting, userRole: user.role });
+    if (isPosting) {
+      console.log("handleReverseEntry aborted: isPosting is true");
+      return;
+    }
+    
+    // Check permissions
+    if (user.role !== 'admin' && user.role !== 'manager' && user.role !== 'data_entry') {
+      console.log("handleReverseEntry aborted: permission denied", user.role);
+      setErrorMsg('عذراً، فقط المستخدمين المخولين لديهم صلاحية عكس القيد');
+      return;
+    }
+
+    if (tx.isReversed || tx.isReversal || tx.status === 'reversed' || tx.status === 'reversal') {
+      console.log("handleReverseEntry aborted: already reversed", tx);
+      setErrorMsg('هذا القيد معكوس بالفعل أو أنه قيد عكسي ولا يمكن عكسه مجدداً');
+      return;
+    }
+
+    setIsPosting(true);
+    console.log("handleReverseEntry proceeding to post reversal");
+    try {
+      const timestampIso = new Date().toISOString();
+      
+      let txsToReverse = [tx];
+      if (tx.linkedTxId) {
+         try {
+           const resLinked = await localDb.query("SELECT * FROM vault_transactions WHERE id = ?", [tx.linkedTxId]);
+           if (resLinked.values && resLinked.values.length > 0) {
+             txsToReverse.push(resLinked.values[0]);
+           }
+         } catch(e) {}
+      }
+
+      // Get next voucher number
+      const resNum = await localDb.query("SELECT COALESCE(MAX(voucherNumber), 1000) as maxNum FROM vault_transactions");
+      let currentNextNum = (resNum.values?.[0]?.maxNum || 1000);
+
+      for (const t of txsToReverse) {
+          if (t.isReversed || t.isReversal) continue;
+          currentNextNum += 1;
+
+          const reverseAmount = -Number(t.amount);
+          const originalVoucherNotes = t.notes || '';
+          const updatedOriginalNotes = `${originalVoucherNotes} [تم عكس القيد بواسطة القيد رقم ${currentNextNum}]`;
+          const reversalNotes = `[قيد عكسي] للمستند رقم ${t.voucherNumber} - ${originalVoucherNotes}`;
+          const reversalTxId = `vtx-${Math.random().toString(36).substring(2, 8)}`;
+
+          // 1. Update original transaction in SQLite
+          await ProviderFactory.getProvider().updateDoc('vault_transactions', t.id, { isReversed: 1, notes: updatedOriginalNotes, updatedAt: timestampIso });
+
+          // 2. Insert reversal counter-transaction
+          await ProviderFactory.getProvider().setDoc('vault_transactions', reversalTxId, {
+            id: reversalTxId, currency: t.currency, amount: reverseAmount, customerName: t.customerName, invoiceNumber: t.invoiceNumber || '',
+            userName: user.name || 'المدير العام', userNumber: user.userNumber || 1, userId: user.id || 'none', timestamp: timestampIso,
+            type: t.type === 'receipt' ? 'payment' : 'receipt', notes: reversalNotes, updatedAt: timestampIso, voucherNumber: currentNextNum,
+            transactionCategory: 'عكس قيد مال', fundId: t.fundId || '', fundName: t.fundName || '', customerId: t.customerId || '',
+            isReversed: 0, isReversal: 1, reversalOf: t.id
+          });
+
+          // 3. Update SQLite fund balance
+          if (t.fundId) {
+            await ProviderFactory.getProvider().updateDoc('fin_funds', t.fundId, { balance: { type: 'increment', value: reverseAmount } });
+          }
+
+          // 3b. Update invoice if linked
+          if (t.invoiceNumber) {
+            // Find invoice
+            const invs = await localDb.query("SELECT id FROM invoices WHERE invoiceNumber = ?", [t.invoiceNumber]);
+            if (invs.values && invs.values.length > 0) {
+              const invId = invs.values[0].id;
+              // If it's a receipt being reversed, we decrease amountPaid. (reverseAmount is negative)
+              // Wait, reverseAmount logic:
+              // If original was receipt (amount > 0), reverseAmount = -t.amount
+              // To update amountPaid, we add reverseAmount
+              await ProviderFactory.getProvider().updateDoc('invoices', invId, { amountPaid: { type: 'increment', value: reverseAmount } });
+            }
+          }
+
+          // 4. Update Firestore if the transaction can be found there
+          try {
+            const originalDocRef = doc(db, 'vault_transactions', t.id);
+            const origSnap = await getDoc(originalDocRef);
+            if (origSnap.exists()) {
+              await setDoc(originalDocRef, {
+                ...origSnap.data(),
+                isReversed: 1,
+                status: 'reversed',
+                notes: updatedOriginalNotes,
+                updatedAt: timestampIso
+              });
+            }
+
+            const reversalDocRef = doc(db, 'vault_transactions', reversalTxId);
+            await setDoc(reversalDocRef, {
+              id: reversalTxId,
+              currency: t.currency,
+              amount: reverseAmount,
+              customerName: t.customerName,
+              invoiceNumber: t.invoiceNumber || '',
+              userName: user.name || 'المدير العام',
+              userNumber: user.userNumber || 1,
+              userId: user.id || 'none',
+              timestamp: timestampIso,
+              type: t.type === 'receipt' ? 'payment' : 'receipt',
+              notes: reversalNotes,
+              updatedAt: timestampIso,
+              voucherNumber: currentNextNum,
+              transactionCategory: 'عكس قيد مال',
+              fundId: t.fundId || '',
+              fundName: t.fundName || '',
+              customerId: t.customerId || '',
+              isReversed: 0,
+              isReversal: 1,
+              reversalOf: t.id,
+              status: 'reversal'
+            });
+          } catch (e) {
+            console.error("Firestore sync error for reversal", e);
+          }
+      }
+
+      setSuccessMsg('تم عكس القيد بنجاح');
+      setTimeout(() => setSuccessMsg(null), 3000);
+      
+      await loadDatabaseData();
+      await calculateNextVoucherNumber();
+
+    } catch (err: any) {
+      console.error("Reversal error:", err);
+      setErrorMsg(err.message || 'فشل عكس القيد');
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
+  // Suggest filtered customer autocomplete search
+  const filteredCustomers = customers.filter(c => 
+    c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+    (c.phone1 && c.phone1.includes(customerSearch))
+  );
+
+  // LEDGER CUSTOMER MATH
+  const selectedLedgerCustomer = customers.find(c => c.id === ledgerCustomerId);
+
+  // Accounting aggregates for the specific customer ledger using verified actual/repaired costs
+  const totalInvoicesCost = ledgerCustomerInvoices.reduce((acc, curr) => {
+    const invItems = getInvoiceItemsForInvoice(curr.invoiceNumber);
+    return acc + getInvoiceActualCost(invItems, curr);
+  }, 0);
+
+  const totalInvoicesPaid = ledgerCustomerInvoices.reduce((acc, curr) => acc + Number(curr.amountPaid || 0), 0);
+  const totalSeparateCollections = ledgerCustomerTransactions
+    .filter(tx => tx.type === 'receipt' && (!tx.invoiceNumber || tx.invoiceNumber.trim() === ''))
+    .reduce((acc, curr) => acc + Math.abs(Number(curr.amount || 0)), 0);
+
+  // Net Debt calculation (Invoices cost minus paid on invoice minus general receipts collections)
+  const customerUnpaidBalance = Math.max(0, totalInvoicesCost - totalInvoicesPaid - totalSeparateCollections);
+
+  const getCustomerUnpaidBalance = (customerId: string) => {
+    const custInvs = invoices.filter(inv => inv.customerId === customerId);
+    const cost = custInvs.reduce((acc, curr) => {
+      const invItems = items.filter(it => it.invoiceNumber === curr.invoiceNumber);
+      return acc + getInvoiceActualCost(invItems, curr);
+    }, 0);
+    const paid = custInvs.reduce((acc, curr) => acc + Number(curr.amountPaid || 0), 0);
+    
+    const custTxs = transactions.filter(tx => tx.customerId === customerId);
+    const collections = custTxs
+      .filter(tx => tx.type === 'receipt' && (!tx.invoiceNumber || tx.invoiceNumber.trim() === ''))
+      .reduce((acc, curr) => acc + Math.abs(Number(curr.amount || 0)), 0);
+      
+    return Math.max(0, cost - paid - collections);
+  };
+
+  const customerStats = React.useMemo(() => {
+    const stats: any[] = [];
+    customers.forEach(cust => {
+      const custInvs = invoices.filter(inv => inv.customerId === cust.id);
+      const custTxs = transactions.filter(tx => tx.customerId === cust.id);
+      
+      const currencies = Array.from(new Set([
+        ...custInvs.map(inv => inv.currency || 'USD'),
+        ...custTxs.map(tx => tx.currency || 'USD')
+      ]));
+
+      // If no activity at all, maybe push a default USD stat with 0?
+      if (currencies.length === 0) {
+        stats.push({
+          customer: cust,
+          currency: 'USD',
+          totalInvoicesCount: 0,
+          totalInvoicesCost: 0,
+          totalInvoicesPaid: 0,
+          unpaidBalance: 0,
+          lastActivityDate: null
+        });
+        return;
+      }
+
+      currencies.forEach(currency => {
+        const invsForCurr = custInvs.filter(inv => (inv.currency || 'USD') === currency);
+        const txsForCurr = custTxs.filter(tx => (tx.currency || 'USD') === currency);
+        
+        if (invsForCurr.length === 0 && txsForCurr.length === 0) return;
+
+        const custCost = invsForCurr.reduce((acc, curr) => {
+          const invItems = items.filter(it => it.invoiceNumber === curr.invoiceNumber);
+          return acc + getInvoiceActualCost(invItems, curr);
+        }, 0);
+        const custPaid = invsForCurr.reduce((acc, curr) => acc + Number(curr.amountPaid || 0), 0);
+        
+        const custCollections = txsForCurr
+          .filter(tx => tx.type === 'receipt' && (!tx.invoiceNumber || tx.invoiceNumber.trim() === ''))
+          .reduce((acc, curr) => acc + Math.abs(Number(curr.amount || 0)), 0);
+          
+        const unpaid = Math.max(0, custCost - custPaid - custCollections);
+        
+        let lastActivity: Date | null = null;
+        invsForCurr.forEach(inv => {
+          const d = parseDate(inv.createdAt) || new Date();
+          if (!lastActivity || d > lastActivity) {
+            lastActivity = d;
+          }
+        });
+        txsForCurr.forEach(tx => {
+          const d = parseTxDate(tx) || new Date();
+          if (!lastActivity || d > lastActivity) {
+            lastActivity = d;
+          }
+        });
+
+        stats.push({
+          customer: cust,
+          currency: currency,
+          totalInvoicesCount: invsForCurr.length,
+          totalInvoicesCost: custCost,
+          totalInvoicesPaid: custPaid + custCollections,
+          unpaidBalance: unpaid,
+          lastActivityDate: lastActivity
+        });
+      });
+    });
+    return stats;
+  }, [customers, invoices, items, transactions]);
+
+  const sortedCustomerStats = React.useMemo(() => {
+    return [...customerStats].sort((a, b) => {
+      if (a.lastActivityDate && b.lastActivityDate) {
+        return b.lastActivityDate.getTime() - a.lastActivityDate.getTime();
+      }
+      if (a.lastActivityDate) return -1;
+      if (b.lastActivityDate) return 1;
+      return a.customer.name.localeCompare(b.customer.name);
+    });
+  }, [customerStats]);
+
+  const filteredLedgerStats = React.useMemo(() => {
+    let stats = sortedCustomerStats.filter(stat => stat.unpaidBalance > 0.01);
+    if (!ledgerSearchTerm.trim()) return stats;
+    const term = ledgerSearchTerm.toLowerCase();
+    return stats.filter(stat => 
+      stat.customer.name.toLowerCase().includes(term) ||
+      (stat.customer.companyName && stat.customer.companyName.toLowerCase().includes(term)) ||
+      (stat.customer.phone1 && stat.customer.phone1.includes(term))
+    );
+  }, [sortedCustomerStats, ledgerSearchTerm]);
+
+  const totalLedgerListPages = Math.max(1, Math.ceil(filteredLedgerStats.length / itemsPerPage));
+  const safeLedgerListPage = Math.min(ledgerListPage, totalLedgerListPages);
+  const currentLedgerListStats = React.useMemo(() => {
+    return filteredLedgerStats.slice((safeLedgerListPage - 1) * itemsPerPage, safeLedgerListPage * itemsPerPage);
+  }, [filteredLedgerStats, safeLedgerListPage]);
+
+  // Generate statement entries chronologically for Selected Customer inside Vault
+  const getStatementEntries = (customerId: string, currency: string) => {
+    const entries: {
+      id: string;
+      date: Date;
+      type: string;
+      label: string;
+      reference: string;
+      notes: string;
+      debit: number;
+      credit: number;
+    }[] = [];
+
+    // 1. Get customer invoices
+    const customerInvs = invoices.filter(inv => inv.customerId === customerId && (inv.currency || 'USD') === currency);
+    customerInvs.forEach(inv => {
+      const invItems = items.filter(it => it.invoiceNumber === inv.invoiceNumber);
+      const actualCost = getInvoiceActualCost(invItems, inv);
+
+      const explicitType = inv.invoiceType || inv.templateType || inv.type || '';
+      let invTypeTitle = 'فاتورة صيانة';
+      let invLabel = 'فاتورة صيانة أجهزة فنية';
+
+      if (explicitType === 'sale_software') {
+        invTypeTitle = 'فاتورة خدمات برمجية';
+        invLabel = 'فاتورة مبيعات - خدمات برمجية';
+      } else if (explicitType === 'sale_parts') {
+        invTypeTitle = 'فاتورة بيع قطع غيار';
+        invLabel = 'فاتورة مبيعات - بيع قطع غيار';
+      } else if (explicitType === 'sale_maintenance') {
+        invTypeTitle = 'فاتورة صيانة خارجية';
+        invLabel = 'فاتورة مبيعات - صيانة خارجية';
+      } else if (typeof explicitType === 'string' && explicitType.startsWith('sale_')) {
+        const sub = explicitType.replace('sale_', '');
+        invTypeTitle = `فاتورة مبيعات (${sub})`;
+        invLabel = `فاتورة مبيعات - ${sub}`;
+      } else if (inv.invoiceNumber && String(inv.invoiceNumber).startsWith('O-')) {
+        invTypeTitle = 'فاتورة مبيعات قطع/خدمات';
+        invLabel = 'فاتورة مبيعات أجهزة وقطع غيار';
+      } else {
+        invTypeTitle = 'فاتورة صيانة';
+        invLabel = 'فاتورة صيانة أجهزة فنية';
+      }
+
+      const itemNotes = invItems.map(i => {
+        const nameStr = i.deviceName || i.deviceType || '';
+        const brandStr = i.brand ? `- ${i.brand}` : '';
+        return `${nameStr} ${brandStr}`.trim();
+      }).filter(Boolean).join(' | ');
+
+      // Merge debit (invoice cost) and credit (amount paid on it) into a single row
+      entries.push({
+        id: `inv-${inv.id}`,
+        date: parseDate(inv.createdAt) || new Date(),
+        type: invTypeTitle,
+        label: invLabel,
+        reference: String(inv.invoiceNumber).replace(/#/g, ''),
+        notes: inv.notes || itemNotes || 'فاتورة خدمات/مبيعات',
+        debit: actualCost,
+        credit: Number(inv.amountPaid || 0)
+      });
+    });
+
+    // 2. Get separate receipts and payments
+    const customerTransactions = transactions.filter(tx => 
+      tx.customerId === customerId && 
+      (tx.liabilityCurrency || tx.currency || 'USD') === currency &&
+      !tx.isReversed &&
+      !tx.isReversal &&
+      tx.status !== 'reversed' &&
+      tx.status !== 'reversal'
+    );
+    customerTransactions.forEach(tx => {
+      const txDate = parseTxDate(tx) || new Date();
+      if (tx.type === 'receipt' || tx.type === 'invoice_payment') {
+        const isLinkedToInvoice = !!tx.invoiceNumber;
+        const liabilityAmount = tx.liabilityAmount || Math.abs(Number(tx.amount || 0));
+        
+        let docType = 'سند قبض';
+        let statement = tx.transactionCategory || 'سند قبض / دفعه تحت الحساب';
+        let details = tx.notes || '';
+        let refStr = String(tx.voucherNumber || tx.id?.substring(0, 5)).replace(/#/g, '');
+
+        if (isLinkedToInvoice) {
+           docType = 'سند قبض';
+           statement = `سند قبض / سداد في فاتورة رقم ${tx.invoiceNumber}`;
+           refStr = String(tx.voucherNumber || tx.invoiceNumber).replace(/#/g, '');
+        } else if (tx.transactionCategory === 'دفعة أجهزة') {
+           docType = 'سند قبض';
+           statement = `سند قبض / سداد في فاتورة رقم ${tx.invoiceNumber || '؟'}`;
+           if (tx.voucherNumber || tx.invoiceNumber) {
+             refStr = String(tx.voucherNumber || tx.invoiceNumber).replace(/#/g, '');
+           }
+        }
+
+        entries.push({
+          id: `tx-${tx.id}`,
+          date: txDate,
+          type: docType,
+          label: statement,
+          reference: refStr,
+          notes: details,
+          debit: 0,
+          credit: liabilityAmount
+        });
+      } else if (tx.type === 'payment') {
+        const liabilityAmount = tx.liabilityAmount || Math.abs(Number(tx.amount || 0));
+        entries.push({
+          id: `tx-${tx.id}`,
+          date: txDate,
+          type: 'سند صرف',
+          label: tx.transactionCategory || tx.notes || 'سند صرف للعميل مستقل',
+          reference: String(tx.voucherNumber || tx.id?.substring(0, 5)).replace(/#/g, ''),
+          notes: tx.notes || 'صرف مالي أو استرجاع نقدي',
+          debit: liabilityAmount,
+          credit: 0
+        });
+      }
+    });
+
+    // 3. Sort chronologically
+    entries.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    // 4. Filter entries that have active financial impact (debit > 0 or credit > 0)
+    const activeEntries = entries.filter(e => e.debit > 0.001 || e.credit > 0.001);
+
+    // 5. Compute running balance
+    let balance = 0;
+    return activeEntries.map(entry => {
+      balance += entry.debit - entry.credit;
+      return {
+        ...entry,
+        runningBalance: balance
+      };
+    });
+  };
+
+  const handleWhatsAppShare = async (customerId: string) => {
+    const cust = customers.find(c => c.id === customerId);
+    if (!cust) return;
+
+    setIsGeneratingPDF(true);
+
+    const originalGetComputedStyle = window.getComputedStyle;
+    let tempEl: HTMLDivElement | null = null;
+    let restore: (() => void) | null = null;
+
+    try {
+      const element = document.getElementById('print-area');
+      if (!element) {
+        setIsGeneratingPDF(false);
+        return;
+      }
+
+      tempEl = document.createElement('div');
+      tempEl.style.display = 'none';
+      document.body.appendChild(tempEl);
+
+      const convertToRgb = (color: string) => {
+        if (!color || (!color.includes('oklch') && !color.includes('oklab'))) return color;
+        try {
+          if (!tempEl) return 'rgb(0, 0, 0)';
+          tempEl.style.color = '';
+          tempEl.style.color = color;
+          const rgb = originalGetComputedStyle.call(window, tempEl).color;
+          if (rgb && !rgb.includes('oklch') && !rgb.includes('oklab')) {
+            return rgb;
+          }
+          return 'rgb(0, 0, 0)';
+        } catch (e) {
+          return 'rgb(0, 0, 0)';
+        }
+      };
+
+      const cleanOklchString = (val: string): string => {
+        if (typeof val !== 'string') return val;
+        if (!val.includes('oklch') && !val.includes('oklab')) return val;
+        return val.replace(/(oklch|oklab)\([^)]+\)/g, (match) => convertToRgb(match));
+      };
+
+      const customGetComputedStyle = function (elt: Element, pseudoElt?: string) {
+        const style = originalGetComputedStyle.call(window, elt, pseudoElt);
+        return new Proxy(style, {
+          get(target, prop) {
+            if (prop === 'getPropertyValue') {
+              return function(propertyName: string) {
+                const val = target.getPropertyValue(propertyName);
+                if (typeof val === 'string' && (val.includes('oklch') || val.includes('oklab'))) {
+                  return cleanOklchString(val);
+                }
+                return val;
+              };
+            }
+            const val = (target as any)[prop];
+            if (typeof val === 'string' && (val.includes('oklch') || val.includes('oklab'))) {
+              return cleanOklchString(val);
+            }
+            if (typeof val === 'function') {
+              return val.bind(target);
+            }
+            return val;
+          }
+        });
+      } as any;
+
+      // Apply globally
+      window.getComputedStyle = customGetComputedStyle;
+
+      restore = await sanitizeDocumentStyles();
+      sanitizeElementInlineStyles(element);
+
+      let clonedAreaHeight = 800; // fallback
+
+      const canvas = await htmlToImage.toCanvas(element, {
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+      const pdf = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+      });
+      const imgWidth = 210;
+      const pageHeight = 297;
+      
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 5) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+        heightLeft -= pageHeight;
+      }
+
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      const printDate = `${year}-${month}-${day}`;
+      const filename = `كشف حساب_${cust.name}_${printDate}.pdf`;
+
+      // 2. Prepare PDF Base64 details & save to database folder and sqlite saved_pdfs
+      let pdfBase64 = '';
+      try {
+        pdfBase64 = pdf.output('datauristring').split(',')[1];
+      } catch (err) {
+        console.error('Failed to get PDF Base64 string:', err);
+      }
+
+      // Save to Capacitor filesystem folder
+      try {
+        await Filesystem.writeFile({
+          path: `SND_App/تقارير/${filename}`,
+          data: pdfBase64,
+          directory: Directory.Documents,
+          recursive: true
+        });
+        console.log('PDF file saved successfully to SND_App/تقارير directory.');
+      } catch (fsError) {
+        console.warn('Skipping Device Filesystem save:', fsError);
+      }
+
+      // Save to SQLite database table (saved_pdfs history log)
+      try {
+        // Create table dynamically in sqlite if not created
+        await localDb.run(`
+          CREATE TABLE IF NOT EXISTS saved_pdfs (
+            id TEXT PRIMARY KEY,
+            customerId TEXT,
+            customerName TEXT,
+            filename TEXT,
+            createdAt TEXT,
+            fileSize TEXT,
+            fileData TEXT
+          )
+        `);
+        const docId = `pdf_${Date.now()}`;
+        const fileSize = `${Math.round(pdfBase64.length * 0.75 / 1024)} KB`;
+        await localDb.run(
+          `INSERT INTO saved_pdfs (id, customerId, customerName, filename, createdAt, fileSize, fileData) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [docId, customerId, cust.name, filename, new Date().toISOString(), fileSize, pdfBase64]
+        );
+        console.log('PDF saved to local database saved_pdfs table!');
+      } catch (dbError) {
+        console.warn('Failed to save to SQLite database table saved_pdfs:', dbError);
+      }
+
+      pdf.save(filename);
+
+      // 3. Launch WhatsApp link or Native Share
+      const totalCost = totalInvoicesCost;
+      const totalPaid = totalInvoicesPaid + totalSeparateCollections;
+      const diff = totalCost - totalPaid;
+      const currency = 'USD';
+
+      let statusText = '';
+      if (diff < -0.01) {
+        statusText = `رصيد دائن للعميل بفائض: ${Math.abs(diff).toLocaleString('en-US')} ${currency}`;
+      } else if (diff > 0.01) {
+        statusText = `متبقي عليه كديون متراكمة: ${Math.abs(diff).toLocaleString('en-US')} ${currency}`;
+      } else {
+        statusText = `الحساب متزن بالكامل (0.00)`;
+      }
+
+      let message = `*كشف حساب مالي رسمي وموحد (منقولات الخزينة) بصيغة PDF* 📄\n\n`;
+      message += `عزيزي العميل *${cust.name}*،\n`;
+      message += `تجدون أدناه الملخص المالي لحسابات الخزينة وقسم الصيانة والقيود المسجلة لدينا. كما تم تنزيل وحفظ مستند الـ PDF للتقرير في مجلد قاعدة البيانات.\n\n`;
+      message += `- *الرصيد الصافي:* ${statusText}\n`;
+      message += `- *إجمالي قيمة صيانة الأجهزة المقبولة:* ${totalCost.toLocaleString('en-US')} ${currency}\n`;
+      message += `- *إجمالي المقبوضات والسندات:* ${totalPaid.toLocaleString('en-US')} ${currency}\n\n`;
+      message += `يرجى مشاركة وإرسال كشف مستند الـ PDF المحفوظ الآن بنجاح على جهازكم.`;
+
+      // Native Share API if supported (to attach actual PDF sheet on mobile)
+      let sharedNatively = false;
+      try {
+        const pdfBlob = pdf.output('blob');
+        sharedNatively = await sharePdfFile(pdfBlob, filename, message, 'report');
+      } catch (shareErr) {
+        console.warn('Native share was skipped:', shareErr);
+      }
+
+      if (!sharedNatively) {
+        openWhatsApp(message, cust.phone1 || '');
+      }
+    } catch (e) {
+      console.error('Failed to export PDF & share:', e);
+    } finally {
+      if (restore) restore();
+      window.getComputedStyle = originalGetComputedStyle;
+      if (tempEl && tempEl.parentNode) {
+        tempEl.parentNode.removeChild(tempEl);
+      }
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  // --- REVENUE & EXPENSE REPORT STATISTICS ---
+  const receiptTransactions = transactions.filter(tx => tx.type === 'receipt');
+  const paymentTransactions = transactions.filter(tx => tx.type === 'payment');
+
+  // Calculates sums of values dynamically grouped by currency code/symbol
+  const computeCurrencyTotals = (txs: VaultTransaction[]) => {
+    const sums: Record<string, number> = {};
+    txs.forEach(tx => {
+      const code = tx.currency || 'USD';
+      sums[code] = (sums[code] || 0) + Math.abs(Number(tx.amount || 0));
+    });
+    return sums;
+  };
+
+  const revenueCurrencyTotals = computeCurrencyTotals(receiptTransactions);
+  const expenseCurrencyTotals = computeCurrencyTotals(paymentTransactions);
+
+  // Build unique currencies checklist for calculations
+  const allUsedCurrencies = Array.from(new Set([
+    ...Object.keys(revenueCurrencyTotals),
+    ...Object.keys(expenseCurrencyTotals),
+    ...funds.map(f => f.currency),
+    ...currencies.map(c => c.name)
+  ]));
+
+  return (
+    <div className="financial-vault-container h-full flex flex-col overflow-hidden text-right pb-4 w-full" dir="rtl">
+      
+
+
+      {/* Notifications banner */}
+      {successMsg && (
+        <div className="mx-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-4 rounded-2xl flex items-center gap-2 text-xs font-cairo transition-all animate-bounce">
+          <CheckCircle2 size={18} />
+          <span>{successMsg}</span>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="mx-4 bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-2xl flex items-center justify-between gap-2 text-xs font-cairo transition-all">
+          <div className="flex items-center gap-2">
+            <X size={18} />
+            <span>{errorMsg}</span>
+          </div>
+          <button onClick={() => setErrorMsg(null)} className="text-[10px] bg-white/5 px-2 py-0.5 rounded hover:bg-white/10">إخفاء</button>
+        </div>
+      )}
+
+      {/* Primary Layout Wrapper */}
+      <div className="flex-1 grid grid-cols-1 gap-4 overflow-hidden">
+        
+        {/* RIGHT SIDEBAR MENU - Accounts Hierarchy */}
+        {false && activeSegment !== 'dashboard' && (
+          <div className="lg:col-span-1 bg-[#101010] border border-white/5 rounded-3xl p-4 flex flex-col gap-5 overflow-y-auto">
+            <div>
+              <h3 className="text-[10px] font-black uppercase text-gray-500 tracking-wider mr-1 mb-2 font-cairo">شجرة النظام المالي</h3>
+              
+              <div className="space-y-1">
+                
+                {/* Dashboard Back */}
+                <button 
+                  onClick={() => { setActiveSegment('dashboard'); setErrorMsg(null); }}
+                  className="p-2.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl transition-all border border-white/5 flex items-center justify-center mb-4"
+                  title="العودة للرئيسية"
+                >
+                  <ArrowRight size={20} className="text-gray-500" />
+                </button>
+
+                {/* Vouchers Header */}
+              <div className="px-2 py-1 text-xs text-gray-400 font-bold font-cairo">
+                سندات التحويل المالي
+              </div>
+
+              {/* Receipt */}
+              <button 
+                onClick={() => { setActiveSegment('receipt'); setErrorMsg(null); }}
+                className={`w-full text-right px-4 py-2.5 rounded-xl text-xs font-bold font-cairo transition-all flex items-center justify-between ${activeSegment === 'receipt' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/15' : 'hover:bg-white/5 text-gray-300'}`}
+              >
+                <span className="flex items-center gap-2">
+                  <TrendingUp size={16} className={activeSegment === 'receipt' ? 'text-white' : 'text-green-500'} />
+                  سند قبض ونقد وارد
+                </span>
+                <span className="font-mono text-[9px] bg-white/10 px-1.5 py-0.5 rounded text-white font-bold">وارد</span>
+              </button>
+
+              {/* Payment */}
+              <button 
+                onClick={() => { setActiveSegment('payment'); setErrorMsg(null); }}
+                className={`w-full text-right px-4 py-2.5 rounded-xl text-xs font-bold font-cairo transition-all flex items-center justify-between ${activeSegment === 'payment' ? 'bg-amber-600 text-white shadow-lg shadow-amber-500/15' : 'hover:bg-white/5 text-gray-300'}`}
+              >
+                <span className="flex items-center gap-2">
+                  <TrendingDown size={16} className={activeSegment === 'payment' ? 'text-white' : 'text-amber-500'} />
+                  سند صرف ونفقات صادرة
+                </span>
+                <span className="font-mono text-[9px] bg-white/10 px-1.5 py-0.5 rounded text-white font-bold">صادر</span>
+              </button>
+
+              <div className="h-[1px] bg-white/5 my-3" />
+
+              {/* Box Funds */}
+              <button 
+                onClick={() => { setActiveSegment('funds'); setErrorMsg(null); }}
+                className={`w-full text-right px-4 py-2.5 rounded-xl text-xs font-bold font-cairo transition-all flex items-center gap-2 ${activeSegment === 'funds' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/15' : 'hover:bg-white/5 text-gray-300'}`}
+              >
+                <Wallet size={16} className={activeSegment === 'funds' ? 'text-white' : 'text-blue-500'} />
+                رصيد وحركة الصناديق المال
+              </button>
+
+              {/* Client Ledger */}
+              <button 
+                onClick={() => { setActiveSegment('customer-ledger'); setErrorMsg(null); }}
+                className={`w-full text-right px-4 py-2.5 rounded-xl text-xs font-bold font-cairo transition-all flex items-center gap-2 ${activeSegment === 'customer-ledger' ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/15' : 'hover:bg-white/5 text-gray-300'}`}
+              >
+                <Users size={16} className={activeSegment === 'customer-ledger' ? 'text-white' : 'text-purple-500'} />
+                كشف حسابات العملاء
+              </button>
+
+              <div className="h-[1px] bg-white/5 my-3" />
+
+              {/* Reports */}
+              <div className="px-2 py-1 text-xs text-gray-400 font-bold font-cairo">
+                التقارير والمؤشرات المالية
+              </div>
+
+              <button 
+                onClick={() => { setActiveSegment('reports'); setReportSubSegment('revenues'); setErrorMsg(null); }}
+                className={`w-full text-right px-4 py-2 rounded-xl text-xs font-medium font-cairo transition-all flex items-center justify-between ${activeSegment === 'reports' && reportSubSegment === 'revenues' ? 'bg-white/10 text-white font-bold' : 'hover:bg-white/5 text-gray-400'}`}
+              >
+                <span>• الإيرادات والمداخيل</span>
+              </button>
+
+              <button 
+                onClick={() => { setActiveSegment('reports'); setReportSubSegment('expenses'); setErrorMsg(null); }}
+                className={`w-full text-right px-4 py-2 rounded-xl text-xs font-medium font-cairo transition-all flex items-center justify-between ${activeSegment === 'reports' && reportSubSegment === 'expenses' ? 'bg-white/10 text-white font-bold' : 'hover:bg-white/5 text-gray-400'}`}
+              >
+                <span>• المصروفات والمدفوعات</span>
+              </button>
+
+              <button 
+                onClick={() => { setActiveSegment('reports'); setReportSubSegment('profits'); setErrorMsg(null); }}
+                className={`w-full text-right px-4 py-2 rounded-xl text-xs font-medium font-cairo transition-all flex items-center justify-between ${activeSegment === 'reports' && reportSubSegment === 'profits' ? 'bg-white/10 text-white font-bold' : 'hover:bg-white/5 text-gray-400'}`}
+              >
+                <span>• الأرباح والصافي</span>
+              </button>
+
+              <button 
+                onClick={() => { setActiveSegment('reports'); setReportSubSegment('fund-balances'); setErrorMsg(null); }}
+                className={`w-full text-right px-4 py-2 rounded-xl text-xs font-medium font-cairo transition-all flex items-center justify-between ${activeSegment === 'reports' && reportSubSegment === 'fund-balances' ? 'bg-white/10 text-white font-bold' : 'hover:bg-white/5 text-gray-400'}`}
+              >
+                <span>• أرصدة كتل الصناديق</span>
+              </button>
+
+              <button 
+                onClick={() => { setActiveSegment('reports'); setReportSubSegment('outstanding-debts'); setErrorMsg(null); }}
+                className={`w-full text-right px-4 py-2 rounded-xl text-xs font-medium font-cairo transition-all flex items-center justify-between ${activeSegment === 'reports' && reportSubSegment === 'outstanding-debts' ? 'bg-white/10 text-white font-bold' : 'hover:bg-white/5 text-gray-400'}`}
+              >
+                <span>• مديونيات وحقوق معلقة</span>
+              </button>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LEFT WORKSPACE CARD */}
+      <div className={`${activeSegment === 'dashboard' ? 'lg:col-span-4 bg-transparent border-0 !p-0 shadow-none' : 'lg:col-span-4 bg-[#101010] border-y border-white/5 p-0'} flex flex-col overflow-y-auto`}>
+          
+          {/* Dashboard View */}
+          {activeSegment === 'dashboard' && (
+            <div className="w-full bg-[#101010] border border-white/5 rounded-[2rem] p-6 sm:p-8 my-auto shadow-2xl">
+              <div>
+                <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4 font-cairo text-right pr-1">{t('vault.treeTitle', 'شجرة النظام المالي')}</h3>
+                
+
+
+                <div className="space-y-3">
+                   <div className="px-1 text-[11px] font-bold text-[#e5e7eb]/40 uppercase tracking-wider font-cairo text-right mb-2">{t('vault.transferSection', 'سندات التحويل المالي')}</div>
+                   
+                   {/* Receipt Row */}
+                   <button 
+                     onClick={() => { setActiveSegment('receipt'); setGlobalSearch(''); }}
+                     className="w-full flex items-center justify-between p-3.5 px-5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl shadow-lg shadow-emerald-950/20 transition-all active:scale-[0.98] group"
+                   >
+                     <div className="flex items-center gap-3">
+                        <TrendingUp size={18} className="text-white" />
+                        <span className="text-xs font-bold font-cairo leading-none">{t('vault.receiptIncoming', 'سند قبض ونقد وارد')}</span>
+                     </div>
+                     <span className="px-2.5 py-1 rounded-lg bg-[#000000]/20 text-[9px] font-bold text-white font-cairo">{t('vault.incoming', 'وارد')}</span>
+                   </button>
+
+                   {/* Payment Row */}
+                   <button 
+                     onClick={() => { setActiveSegment('payment'); setGlobalSearch(''); }}
+                     className="w-full flex items-center justify-between p-3.5 px-5 bg-[#181818] hover:bg-[#202020] border border-white/5 rounded-2xl transition-all active:scale-[0.98] group"
+                   >
+                     <div className="flex items-center gap-3">
+                        <TrendingDown size={18} className="text-amber-500" />
+                        <span className="text-xs font-bold text-gray-300 font-cairo leading-none">{t('vault.paymentOutgoing', 'سند صرف ونفقات صادرة')}</span>
+                     </div>
+                     <span className="px-2.5 py-1 rounded-lg bg-white/5 text-[9px] font-bold text-gray-500 font-cairo">{t('vault.outgoing', 'صادر')}</span>
+                   </button>
+
+                   {/* Transfer Row */}
+                   <button 
+                     onClick={() => { setActiveSegment('transfer'); setGlobalSearch(''); }}
+                     className="w-full flex items-center justify-between p-3.5 px-5 bg-[#181818] hover:bg-[#202020] border border-white/5 rounded-2xl transition-all active:scale-[0.98] group"
+                   >
+                     <div className="flex items-center gap-3">
+                        <ArrowRightLeft size={18} className="text-blue-400" />
+                        <span className="text-xs font-bold text-gray-300 font-cairo leading-none">التحويل بين الصناديق</span>
+                     </div>
+                     <span className="px-2.5 py-1 rounded-lg bg-white/5 text-[9px] font-bold text-gray-500 font-cairo">داخلي</span>
+                   </button>
+
+                   <div className="pt-1 space-y-1">
+                     <button 
+                       onClick={() => setActiveSegment('funds')}
+                       className="w-full flex items-center justify-between p-3 px-5 bg-transparent hover:bg-white/5 rounded-xl transition-all"
+                     >
+                       <div className="flex items-center gap-3">
+                          <Wallet size={18} className="text-blue-500" />
+                          <span className="text-xs font-bold text-gray-300 font-cairo leading-none">{t('vault.fundBalances', 'رصيد وحركات الصناديق المال')}</span>
+                       </div>
+                     </button>
+
+                     <button 
+                       onClick={() => setActiveSegment('customer-ledger')}
+                       className="w-full flex items-center justify-between p-3 px-5 bg-transparent hover:bg-white/5 rounded-xl transition-all"
+                     >
+                       <div className="flex items-center gap-3">
+                          <Users size={18} className="text-purple-500" />
+                          <span className="text-xs font-bold text-gray-300 font-cairo leading-none">{t('vault.customersLedger', 'كشف حساب العملاء')}</span>
+                       </div>
+                     </button>
+                   </div>
+                </div>
+
+                {/* Reports Section */}
+                <div className="mt-8 pt-6 border-t border-white/5 space-y-4">
+                   <div className="px-1 text-[11px] font-bold text-[#e5e7eb]/40 uppercase tracking-wider font-cairo text-right mb-2">{t('vault.reportsSection', 'التقارير والمؤشرات المالية')}</div>
+                   
+                   <div className="space-y-0.5">
+                      {[
+                        { name: t('vault.reportRevenues', 'الإيرادات والمداخيل'), key: 'revenues' },
+                        { name: t('vault.reportExpenses', 'المصروفات والمدفوعات'), key: 'expenses' },
+                        { name: t('vault.reportProfits', 'الأرباح والصافي'), key: 'profits' },
+                        { name: t('vault.reportFundBalances', 'أرصدة كتل الصناديق'), key: 'fund-balances' },
+                        { name: t('vault.reportOutstandingDebts', 'مديونيات وحقوق معلقة'), key: 'outstanding-debts' }
+                      ].map((report, idx) => (
+                        <div 
+                          key={idx} 
+                          onClick={() => { setActiveSegment('reports'); setReportSubSegment(report.key); setErrorMsg(null); }}
+                          className="flex items-center justify-between p-2.5 px-4 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all cursor-pointer group text-right"
+                        >
+                          <span className="text-xs font-bold font-cairo">{report.name}</span>
+                          <div className="w-1.5 h-1.5 bg-gray-700 rounded-sm group-hover:bg-amber-500 transition-all ml-1" />
+                        </div>
+                      ))}
+                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 1. RECEIPT OR PAYMENT VOUCHERS LIST VIEW */}
+          {(activeSegment === 'receipt' || activeSegment === 'payment') && !showAddModal && (
+            <div className="space-y-5">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-base font-bold text-white font-cairo">
+                    {activeSegment === 'receipt' ? 'سندات القبض' : 'سندات الصرف'}
+                  </h3>
+                  <button 
+                    onClick={() => setActiveSegment('dashboard')}
+                    className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-all"
+                  >
+                    <ArrowRight size={16} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                 <div className="flex items-center justify-between text-[11px] text-gray-500 font-bold px-1" dir="rtl">
+                    <span>البحث المباشر:</span>
+                 </div>
+
+                 <div className="flex gap-3">
+                    <div className="flex-1 relative group">
+                       <Search className="absolute right-4 top-3 text-gray-600 group-focus-within:text-amber-500 transition-colors" size={16} />
+                       <input 
+                         type="text" 
+                         placeholder="ابدأ بكتابة اسم العميل أو رقم السند..."
+                         value={globalSearch}
+                         onChange={(e) => setGlobalSearch(e.target.value)}
+                         className="w-full bg-[#161616] border border-white/5 rounded-xl pr-11 pl-4 py-3 text-[11px] font-cairo text-white outline-none focus:border-amber-500/50 transition-all font-bold placeholder:text-gray-700"
+                       />
+                    </div>
+                    
+                    {canAdd && (
+                      <button 
+                         onClick={() => setShowAddModal(true)}
+                         className="p-3 bg-amber-600/10 text-amber-500 border border-amber-500/20 rounded-xl hover:bg-amber-600 hover:text-white transition-all flex items-center justify-center active:scale-95"
+                         title="إضافة سند جديد"
+                      >
+                         <Plus size={20} />
+                      </button>
+                    )}
+                 </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-1" dir="rtl">
+                   <div className="flex items-center gap-2">
+                      <div className="p-2 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-xl">
+                         <FileText size={16} />
+                      </div>
+                      <span className="text-xs font-bold text-gray-300 font-cairo">جدول جميع السندات المسجلة في النظام</span>
+                   </div>
+                   <div className="relative">
+                     <button 
+                       onClick={() => setShowVoucherSort(!showVoucherSort)}
+                       className="p-2 bg-white/5 border border-white/5 rounded-lg text-gray-400 hover:text-white transition-all flex items-center gap-1.5"
+                     >
+                        <span className="text-[10px] font-bold font-cairo sm:block hidden">ترتيب وفرز</span>
+                        <ArrowUpDown size={14} />
+                     </button>
+                     {showVoucherSort && (
+                        <div className="absolute z-50 left-0 mt-2 bg-[#1f1f1f] border border-white/10 rounded-xl shadow-2xl p-1.5 w-48">
+                          <button onClick={() => { setVoucherSortConfig({ key: 'voucherNumber', direction: 'desc' }); setShowVoucherSort(false); }} className="w-full text-right px-3 py-1.5 text-[10px] hover:bg-amber-600 hover:text-white text-slate-300 rounded font-bold font-cairo transition-colors">حسب رقم السند (الأحدث)</button>
+                          <button onClick={() => { setVoucherSortConfig({ key: 'alpha', direction: 'asc' }); setShowVoucherSort(false); }} className="w-full text-right px-3 py-1.5 text-[10px] hover:bg-amber-600 hover:text-white text-slate-300 rounded font-bold font-cairo transition-colors">حسب اسم العميل (أ - ي)</button>
+                          <button onClick={() => { setVoucherSortConfig({ key: 'alpha', direction: 'desc' }); setShowVoucherSort(false); }} className="w-full text-right px-3 py-1.5 text-[10px] hover:bg-amber-600 hover:text-white text-slate-300 rounded font-bold font-cairo transition-colors">حسب اسم العميل (ي - أ)</button>
+                          <button onClick={() => { setVoucherSortConfig({ key: 'category', direction: 'asc' }); setShowVoucherSort(false); }} className="w-full text-right px-3 py-1.5 text-[10px] hover:bg-amber-600 hover:text-white text-slate-300 rounded font-bold font-cairo transition-colors">حسب نوع العملية</button>
+                          <button onClick={() => { setVoucherSortConfig({ key: 'amount', direction: 'desc' }); setShowVoucherSort(false); }} className="w-full text-right px-3 py-1.5 text-[10px] hover:bg-amber-600 hover:text-white text-slate-300 rounded font-bold font-cairo transition-colors">مبلغ السند (الأكبر)</button>
+                          <button onClick={() => { setVoucherSortConfig({ key: 'amount', direction: 'asc' }); setShowVoucherSort(false); }} className="w-full text-right px-3 py-1.5 text-[10px] hover:bg-amber-600 hover:text-white text-slate-300 rounded font-bold font-cairo transition-colors">مبلغ السند (الأصغر)</button>
+                          <button onClick={() => { setVoucherSortConfig({ key: 'date', direction: 'desc' }); setShowVoucherSort(false); }} className="w-full text-right px-3 py-1.5 text-[10px] hover:bg-amber-600 hover:text-white text-slate-300 rounded font-bold font-cairo transition-colors">حسب التاريخ (الأحدث)</button>
+                        </div>
+                     )}
+                   </div>
+                </div>
+
+                <div className="border border-white/5 rounded-2xl overflow-x-auto bg-black/10 scrollbar-thin">
+                  <table className="w-full text-right text-[11px] whitespace-nowrap">
+                    <thead>
+                      <tr className="bg-white/5 text-gray-500 font-bold border-b border-white/5 uppercase">
+                        <th className="px-4 py-3">رقم السند</th>
+                        <th className="px-4 py-3">اسم العميل / الجهة</th>
+                        <th className="px-4 py-3 text-center">نوع العملية</th>
+                        <th className="px-4 py-3 text-center">مبلغ السند</th>
+                        <th className="px-4 py-3 text-center">الحالة / عكس القيد</th>
+                        <th className="px-4 py-3 text-left">التاريخ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {sortedTransactions
+                        .filter(tx => tx.type === activeSegment)
+                        .filter(tx => {
+                          if (!globalSearch) return true;
+                          const searchLower = globalSearch.toLowerCase();
+                          return tx.customerName.toLowerCase().includes(searchLower) || tx.voucherNumber.toString().includes(searchLower);
+                        })
+                        .map(tx => (
+                          <tr key={tx.id} className="hover:bg-white/5 bg-[#141414] transition-all group">
+                            <td className="px-4 py-2.5 font-mono font-bold text-amber-500">{tx.voucherNumber}</td>
+                            <td className="px-4 py-2.5 font-bold text-gray-200">{tx.customerName}</td>
+                            <td className="px-4 py-2.5 text-center">
+                               <span className={`px-2 py-1 rounded text-[10px] font-bold ${activeSegment === 'receipt' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                                  {tx.transactionCategory || (activeSegment === 'receipt' ? 'قبض' : 'صرف')}
+                               </span>
+                            </td>
+                            <td className={`px-4 py-2.5 text-center font-bold text-xs ${activeSegment === 'receipt' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                              {Math.abs(tx.amount).toLocaleString('en-US')} <span className="text-[9px] opacity-70 font-sans">{tx.currency}</span>
+                            </td>
+                            <td className="px-4 py-2.5 text-center">
+                              {tx.isReversed ? (
+                                <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20" title={tx.notes}>
+                                  تم العكس
+                                </span>
+                              ) : tx.isReversal ? (
+                                <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20" title={tx.notes}>
+                                  قيد عكسي
+                                </span>
+                              ) : (user.role === 'admin' || user.role === 'manager' || user.role === 'data_entry') ? (
+                                <button
+                                  onClick={() => {
+                                    console.log("Setting transaction for custom confirmation modal:", tx.id);
+                                    setReversalTxToConfirm(tx);
+                                  }}
+                                  className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-500 hover:bg-amber-600 hover:text-white border border-amber-500/20 transition-all cursor-pointer"
+                                >
+                                  عكس القيد
+                                </button>
+                              ) : (
+                                <span className="text-gray-500 text-[10px] italic">سليم</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-left text-gray-500 font-mono italic">
+                              {formatTxDate(tx)}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 1. RECEIPT OR PAYMENT VOUCHERS SUBMIT SEGMENTS (Now as a modal or dedicated state) */}
+          {(activeSegment === 'receipt' || activeSegment === 'payment') && showAddModal && (
+            <div className="space-y-6 animate-fade-in pb-48">
+              
+              {/* Show PRINT PREVIEW if true */}
+              {showPrintPreview ? (
+                <div className="fixed inset-0 z-[120] bg-black/95 flex flex-col pointer-events-auto" dir="rtl">
+                  {/* Top Actions Bar */}
+                  <div className="flex flex-col sm:flex-row justify-between items-center bg-black/50 p-4 border-b border-white/10 shrink-0 gap-4 print:hidden">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <button 
+                        onClick={() => setShowPrintPreview(false)}
+                        className="p-2.5 bg-slate-200 border border-slate-300 rounded-xl text-slate-900 hover:bg-slate-300 transition-all flex items-center shadow-md cursor-pointer"
+                        title="العودة للتعديل"
+                      >
+                        <ArrowRight size={20} />
+                      </button>
+                      <h2 className="text-white font-bold font-cairo">معاينة {activeSegment === 'receipt' ? 'سند قبض' : 'سند صرف'}</h2>
+                    </div>
+                    
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                      {/* Save Voucher */}
+                      <button 
+                        onClick={(e) => handleSaveFinalVoucher(e, 'commit')}
+                        disabled={isPosting}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-[0_0_15px_rgba(5,150,105,0.3)] font-cairo cursor-pointer"
+                      >
+                        {isPosting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                        حفظ وترحيل
+                      </button>
+
+                      {/* Save and print */}
+                      <button 
+                        onClick={(e) => handleSaveFinalVoucher(e, 'print')}
+                        disabled={isPosting}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-xs sm:text-sm disabled:opacity-50 font-cairo cursor-pointer"
+                      >
+                        <Printer size={16} />
+                        حفظ وطباعة مباشرة
+                      </button>
+
+                      {/* Save and WhatsApp */}
+                      <button 
+                        onClick={(e) => handleSaveFinalVoucher(e, 'whatsapp')}
+                        disabled={isPosting}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-xs sm:text-sm shadow-[0_0_15px_rgba(5,150,105,0.3)] disabled:opacity-50 font-cairo cursor-pointer"
+                      >
+                        {isPosting ? <Loader2 size={16} className="animate-spin" /> : <WhatsAppIcon className="w-4 h-4 flex-shrink-0" />}
+                        حفظ وتصدير للواتس
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* High Fidelity Paper (820px) centered to look like an actual generated PDF */}
+                  <div className="flex-1 overflow-x-auto bg-black p-4 md:p-8 pb-24 text-right w-full">
+                    <style>{`
+                      @media print {
+                        body * {
+                          visibility: hidden !important;
+                        }
+                        #print-area, #print-area * {
+                          visibility: visible !important;
+                        }
+                        #print-area {
+                          position: absolute !important;
+                          left: 0 !important;
+                          top: 0 !important;
+                          width: 100% !important;
+                          max-width: 100% !important;
+                          color: #000000 !important;
+                          background-color: #ffffff !important;
+                          box-shadow: none !important;
+                          border: none !important;
+                          padding: 30px !important;
+                          margin: 0 !important;
+                          border-radius: 0 !important;
+                        }
+                      }
+                    `}</style>
+                    <div id="print-area" className="p-8 bg-white text-gray-900 print:p-0 print:bg-white print:text-black w-[794px] min-h-fit mx-auto flex flex-col relative shrink-0 font-cairo text-right" dir="rtl">
+                      {/* Faint print date and time watermark */}
+                      <div className="absolute left-8 top-3 text-[8px] text-gray-400 font-normal select-none opacity-45 font-mono pointer-events-none" dir="rtl">
+                        تاريخ ووقت الطباعة: {new Date().toLocaleDateString('ar-YE')} {new Date().toLocaleTimeString('ar-YE', { hour12: true, hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      {/* Header Box identical format to device inspection report */}
+                      <div className="flex justify-between items-start border-b-2 border-gray-900 pb-4 mb-6">
+                        {/* Right Corner: Shop Name */}
+                        <div className="text-right flex-1 pt-1">
+                          <h2 className="text-xl font-black text-gray-900 tracking-tight leading-tight font-cairo whitespace-nowrap">{shopConfig?.shopName || 'عالم الصيانة والتجارة'}</h2>
+                          <div className="text-sm font-black text-gray-900 tracking-tight leading-tight mt-1.5 font-cairo">قسم الحسابات والمالية</div>
+                          <div className="mt-2 space-y-1">
+                            {(shopConfig?.phone1 || shopConfig?.phone2) && (
+                              <div className="text-[10px] font-bold text-gray-800 flex items-center justify-start gap-1.5 w-fit">
+                                <span>تلفون :</span>
+                                <span dir="ltr" className="font-mono">
+                                  {shopConfig?.phone1}
+                                  {shopConfig?.phone1 && shopConfig?.phone2 && ' - '}
+                                  {shopConfig?.phone2}
+                                </span>
+                                <div className="flex items-center gap-1 mr-1.5">
+                                  <Smartphone size={10} className="text-gray-700" />
+                                  {(shopConfig?.phone1Whatsapp || shopConfig?.phone2Whatsapp) && (
+                                    <MessageCircle size={10} className="text-green-600" />
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            {shopConfig?.landline && (
+                              <div className="text-[10px] font-bold text-gray-800 flex items-center justify-start gap-1.5 w-fit">
+                                <span>ثابت :</span>
+                                <span dir="ltr" className="font-mono">{shopConfig.landline}</span>
+                                <div className="flex items-center gap-1 mr-1.5">
+                                  <Phone size={10} className="text-gray-700" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Center: Title / Logo */}
+                        <div className="text-center flex-[1.4] flex flex-col items-center justify-center">
+                          {shopConfig?.logoUrl ? (
+                            <img src={shopConfig.logoUrl} alt="Logo" className="h-16 max-w-[150px] object-contain mb-1.5" referrerPolicy="no-referrer" />
+                          ) : (
+                            <div className="w-12 h-12 border border-dashed border-gray-300 rounded-xl mb-1.5 flex items-center justify-center text-gray-400 text-[10px] font-bold font-sans">شعار المحل</div>
+                          )}
+                          <h1 className="text-xl font-black text-gray-950 tracking-tight border-b-2 border-gray-950 px-6 py-0.5 inline-block font-cairo bg-gray-50/50">
+                            {activeSegment === 'receipt' ? 'سَنَد قَبْض مَالِي' : 'سَنَد صَرْف مَالِي'}
+                          </h1>
+                        </div>
+
+                        {/* Left Corner: Metadata */}
+                        <div className="text-left flex-1 space-y-1 pt-1 bg-gray-50/50 p-3 rounded-lg border border-gray-200">
+                          <div className="text-sm font-bold text-gray-700 flex justify-between gap-4">
+                            <span>رقم السند:</span>
+                            <span className="font-mono text-gray-900">{nextVoucherNum}</span>
+                          </div>
+                          <div className="text-sm font-bold text-gray-700 flex justify-between gap-4">
+                            <span>التاريخ:</span>
+                            <span className="font-mono text-gray-900">{new Date().toLocaleDateString('ar-YE', { year: 'numeric', month: 'numeric', day: 'numeric' })}</span>
+                          </div>
+                          <div className="text-sm font-bold text-gray-700 flex justify-between gap-4">
+                            <span>وقت الإصدار:</span>
+                            <span className="font-mono text-gray-900">
+                              {new Date().toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <div className="text-sm font-bold text-gray-700 flex justify-between gap-4 border-t border-gray-200 pt-1 mt-1 font-cairo">
+                            <span>رقم المستخدم:</span>
+                            <span className="font-mono text-gray-900">{user?.userNumber || '100'}</span>
+                          </div>
+                          {funds.find(f => f.id === selectedFundId)?.type !== 'cash' && referenceNumber && (
+                            <div className="text-sm font-bold text-gray-700 flex justify-between gap-4">
+                              <span>رقم المرجع:</span>
+                              <span className="font-mono text-gray-900">{referenceNumber}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+
+
+
+
+
+                      {/* Main Voucher Grid Information */}
+                      <div className="border border-gray-400 rounded-xl overflow-hidden mb-6">
+                        <div className="grid grid-cols-4 bg-gray-50 border-b border-gray-300 text-xs text-gray-700 font-bold">
+                          <div className="col-span-1 px-4 py-2 border-l border-gray-300">البيان المالي</div>
+                          <div className="col-span-3 px-4 py-2">التفاصيل والبيانات المدخلة</div>
+                        </div>
+                        
+                        <div className="divide-y divide-gray-300 text-xs">
+                          {/* 1. Name */}
+                          <div className="grid grid-cols-4">
+                            <div className="col-span-1 bg-gray-50 px-4 py-2.5 font-bold border-l border-gray-300 text-gray-800">
+                              {activeSegment === 'receipt' ? 'مقبوض من السيد:' : 'مدفوع إلى السيد:'}
+                            </div>
+                            <div className="col-span-3 px-4 py-2.5 font-bold text-gray-950">
+                              {customerSearch || 'جهة عامة أخرى'}
+                            </div>
+                          </div>
+
+                          {/* 2. Amount */}
+                          <div className="grid grid-cols-4">
+                            <div className="col-span-1 bg-gray-50 px-4 py-2.5 font-bold border-l border-gray-300 text-gray-800">المبلغ الإجمالي:</div>
+                            <div className="col-span-3 px-4 py-2.5 font-black text-emerald-700 text-sm">
+                              {(() => {
+                                const parsedAmount = parseFloat(voucherAmount) || 0;
+                                let computed = parsedAmount;
+                                if (liabilityCurrency && liabilityCurrency !== selectedCurrency) {
+                                  const rate = parseFloat(voucherExchangeRate) || 1;
+                                  computed = rate > 0 ? Math.round((parsedAmount / rate) * 100) / 100 : 0;
+                                }
+                                return computed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                              })()} {currencies.find(c => c.name === liabilityCurrency)?.name || liabilityCurrency || selectedCurrency}
+                            </div>
+                          </div>
+
+                          {/* 3. Category */}
+                          <div className="grid grid-cols-4">
+                            <div className="col-span-1 bg-gray-50 px-4 py-2.5 font-bold border-l border-gray-300 text-gray-800">نوع العملية والتصنيف:</div>
+                            <div className="col-span-3 px-4 py-2.5 text-gray-900 font-semibold">
+                              {selectedCategory}
+                            </div>
+                          </div>
+
+                          {/* 4. Fund Box */}
+                          <div className="grid grid-cols-4">
+                            <div className="col-span-1 bg-gray-50 px-4 py-2.5 font-bold border-l border-gray-300 text-gray-800">رقم الصندوق:</div>
+                            <div className="col-span-3 px-4 py-2.5 text-gray-900 font-semibold flex items-center gap-2">
+                              <span className="font-mono" dir="ltr">{funds.find(f => f.id === selectedFundId)?.id?.replace('fund-', '') || selectedFundId}</span>
+                              <span className="text-[10px] bg-gray-200 text-gray-700 px-2 py-0.5 rounded font-black">
+                                {funds.find(f => f.id === selectedFundId)?.type === 'cash' ? 'نقدي' : 'حساب بنكي'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* 5. Bank Info if exists */}
+                          {funds.find(f => f.id === selectedFundId)?.type !== 'cash' && (
+                            <>
+                              <div className="grid grid-cols-4">
+                                <div className="col-span-1 bg-gray-50 px-4 py-2.5 font-bold border-l border-gray-300 text-gray-800">رقم المرجع البنكي:</div>
+                                <div className="col-span-3 px-4 py-2.5 text-gray-955 font-mono font-bold">
+                                  {referenceNumber}
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-4">
+                                <div className="col-span-1 bg-gray-50 px-4 py-2.5 font-bold border-l border-gray-300 text-gray-800">اسم مودع المبلغ:</div>
+                                <div className="col-span-3 px-4 py-2.5 text-gray-955 font-semibold">
+                                  {depositorName}
+                                </div>
+                              </div>
+                            </>
+                          )}
+
+                          {/* 6. Notes */}
+                          <div className="grid grid-cols-4">
+                            <div className="col-span-1 bg-gray-50 px-4 py-2.5 font-bold border-l border-gray-300 text-gray-800">الشرح والبيان:</div>
+                            <div className="col-span-3 px-4 py-2.5 text-gray-900 font-semibold text-sm leading-relaxed">
+                              {(() => {
+                                const parsedAmount = parseFloat(voucherAmount) || 0;
+                                let computed = parsedAmount;
+                                if (liabilityCurrency && liabilityCurrency !== selectedCurrency) {
+                                  const rate = parseFloat(voucherExchangeRate) || 1;
+                                  computed = rate > 0 ? Math.round((parsedAmount / rate) * 100) / 100 : 0;
+                                }
+                                const statementKeyword = activeSegment === 'receipt' ? 'لكم' : 'عليكم';
+                                const currencyNameText = currencies.find(c => c.name === liabilityCurrency)?.name || liabilityCurrency || '';
+                                return `${voucherNotes.trim()} ${statementKeyword} مبلغ ${tafqeet(computed)} ${currencyNameText} مقابل ${selectedCategory}`;
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Stamp & Signatures */}
+                      <div className="grid grid-cols-3 gap-6 text-center mt-12 text-xs pt-4 border-t border-dashed border-gray-300">
+                        <div>
+                          <p className="font-bold text-gray-800 mb-10">المستلم / المحاسب</p>
+                          <p className="text-gray-400">_____________________</p>
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-800 mb-10">الختم الرسمي</p>
+                          <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-full mx-auto flex items-center justify-center text-gray-300 text-[10px]">قسم الصندوق</div>
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-800 mb-10">المودع / العميل</p>
+                          <p className="text-gray-400">_____________________</p>
+                        </div>
+                      </div>
+
+                      <div className="border-t-[3px] border-black mt-2 mb-1 border-solid"></div>
+                      
+                      {/* Address and Facebook */}
+                      <div className="flex flex-row items-center justify-between text-[10px] font-bold text-black font-cairo py-1 mt-0">
+                        {shopConfig?.address && (
+                          <div className="flex items-center gap-1.5 justify-center flex-row-reverse text-center w-max">
+                             <MapPin size={12} className="text-gray-600" />
+                             <span>{shopConfig.address}</span>
+                          </div>
+                        )}
+
+                        {shopConfig?.facebookUrl && (
+                          <div className="flex items-center gap-1.5 justify-center flex-row-reverse text-center w-max">
+                             <Facebook size={12} className="text-blue-600" />
+                             <span dir="ltr">{shopConfig.facebookUrl}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-2">
+                        <BankAccountsFooter shopConfig={shopConfig} currentOutput={currentOutput || { output_datetime: new Date() }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Header Title */}
+                  <div className="border-b border-white/5 pb-3 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-base font-black text-white font-cairo">
+                         {activeSegment === 'receipt' ? 'بناء سند قبض جديد' : 'بناء سند صرف جديد'}
+                      </h3>
+                    </div>
+                    <div className="bg-[#141414] px-3 py-1 rounded-xl border border-white/5 flex items-center gap-2">
+                      <span className="text-[9px] text-gray-500 font-bold font-cairo">رقم السند المتوقع:</span>
+                      <span className="text-sm font-mono font-black text-amber-500">{nextVoucherNum}</span>
+                    </div>
+                  </div>
+
+                  
+                  {/* FORM BODY - Unified Compact Layout */}
+                  <div className="max-w-xl mx-auto bg-[#141414] border border-white/5 rounded-2xl p-3.5 space-y-1.5 font-cairo">
+                     
+                     {/* 1. الصندوق المالي */}
+                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-4 py-1 border-b border-white/5">
+                        <label className="text-[11px] font-bold text-gray-400 min-w-[120px]">
+                          الصندوق المالي:
+                        </label>
+                        <select 
+                          value={selectedFundId}
+                          onFocus={handleInputFocus} onChange={(e) => setSelectedFundId(e.target.value)}
+                          className="flex-1 max-w-xs bg-black/40 border border-white/5 rounded-xl px-3 py-1 text-xs text-white outline-none focus:border-amber-500/50 text-right appearance-none font-semibold"
+                          required
+                        >
+                           <option value="" className="bg-[#1c1c1c]">-- اختر الصندوق --</option>
+                           {funds.map(f => {
+                             const mCur = currencies.find(c => c.name === f.currency);
+                             const curSym = mCur ? mCur.symbol : f.currency;
+                             const typeStr = f.type === 'cash' ? 'نقدي' : 'بنكي';
+                             return (
+                               <option key={f.id} value={f.id} className="bg-[#1c1c1c]">
+                                 {`${f.name} / ${curSym} / ${typeStr}`}
+                               </option>
+                             );
+                           })}
+                        </select>
+                     </div>
+
+                     {/* 2. نوع العملية */}
+                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-4 py-1 border-b border-white/5">
+                        <label className="text-[11px] font-bold text-gray-400 min-w-[120px]">
+                          نوع العملية:
+                        </label>
+                        <select 
+                          value={selectedCategory}
+                          onFocus={handleInputFocus} onChange={(e) => setSelectedCategory(e.target.value)}
+                          className="flex-1 max-w-xs bg-black/40 border border-white/5 rounded-xl px-3 py-1 text-xs text-white outline-none focus:border-amber-500/50 appearance-none text-right font-semibold"
+                          required
+                        >
+                           {txTypes
+                             .filter(cat => cat.type === activeSegment)
+                             .map(cat => (
+                               <option key={cat.id} value={cat.name} className="bg-[#1c1c1c]">{cat.name}</option>
+                             ))
+                           }
+                        </select>
+                     </div>
+
+                     {/* 3. اسم العميل */}
+                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-4 py-1 border-b border-white/5">
+                        <label className="text-[11px] font-bold text-gray-400 min-w-[120px]">
+                          اسم العميل / المستفيد:
+                        </label>
+                        <div className="flex-1 max-w-xs relative bg-transparent text-right">
+                           <div className="flex gap-1">
+                             <input 
+                               type="text"
+                               placeholder="ابحث بالحرف أو اختر من السهم..."
+                               value={customerSearch}
+                               onChange={(e) => {
+                                  setCustomerSearch(e.target.value);
+                                  setSelectedCustomerId('');
+                                  setShowCustomerDropdown(true);
+                               }}
+                               onFocus={(e) => { setShowCustomerDropdown(true); handleInputFocus(e); }}
+                               className="flex-1 bg-black/40 border border-white/5 rounded-xl px-3 py-1 text-xs text-white outline-none focus:border-amber-500/50"
+                             />
+                             <button 
+                               type="button"
+                               onClick={() => setShowCustomerDropdown(!showCustomerDropdown)}
+                               className="px-2 bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 border border-white/5"
+                             >
+                               <ArrowUpDown size={14} />
+                             </button>
+                           </div>
+
+                           {/* Combobox Dropdown */}
+                           {showCustomerDropdown && (
+                              <div className="absolute top-full right-0 w-full mt-1 bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden z-30 shadow-2xl max-h-40 overflow-y-auto">
+                                {customers
+                                  .filter(c => 
+                                    !customerSearch || 
+                                    c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                                    (c.phone1 && c.phone1.includes(customerSearch))
+                                  )
+                                  .map(c => (
+                                    <button 
+                                      key={c.id}
+                                      type="button"
+                                      onClick={() => {
+                                         setCustomerSearch(c.name);
+                                         setSelectedCustomerId(c.id);
+                                         setLiabilityCurrency(c.liabilityCurrency || 'USD');
+                                         setShowCustomerDropdown(false);
+                                      }}
+                                      className="w-full text-right px-3 py-2 text-[10px] text-gray-300 hover:bg-amber-600/20 hover:text-white transition-all font-cairo border-b border-white/5 last:border-0"
+                                    >
+                                      {c.name} {c.companyName ? `(${c.companyName})` : ''}
+                                    </button>
+                                  ))}
+                                  {customers.filter(c => !customerSearch || c.name.toLowerCase().includes(customerSearch.toLowerCase())).length === 0 && (
+                                     <div className="p-3 text-center text-xs text-gray-650">لا توجد نتائج مسبقة، السند سيسجل باسم جديد</div>
+                                  )}
+                              </div>
+                           )}
+                        </div>
+                     </div>
+
+                     {/* 4. عملة الذمة */}
+                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-4 py-1 border-b border-white/5">
+                        <label className="text-[11px] font-bold text-gray-400 min-w-[120px]">
+                          عملة الذمة (الحساب):
+                        </label>
+                        <select 
+                          value={liabilityCurrency}
+                          disabled={true}
+                          className="flex-1 max-w-xs bg-black/40 border border-white/5 rounded-xl px-3 py-1 text-xs text-white outline-none text-right appearance-none font-semibold opacity-70 cursor-not-allowed pointer-events-none"
+                          required
+                        >
+                           {currencies.map(c => (
+                             <option key={c.id} value={c.name} className="bg-[#1c1c1c]">
+                               {`${c.name} - ${c.symbol}`}
+                             </option>
+                           ))}
+                        </select>
+                     </div>
+
+                     {/* 5. المبلغ المدفوع الحالي */}
+                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-4 py-1 border-b border-white/5">
+                        <label className="text-[11px] font-bold text-gray-400 min-w-[120px]">
+                          المبلغ المدفوع الحالي:
+                        </label>
+                        <div className="flex-1 max-w-xs relative text-right">
+                           <input 
+                             type="text"
+                             inputMode="decimal"
+                             dir="ltr"
+                             lang="en"
+                             onFocus={e => { e.target.select(); handleInputFocus(e); }}
+                             placeholder="0.00"
+                             value={voucherAmount}
+                             onChange={(e) => {
+                               const val = e.target.value.replace(/[^0-9.]/g, '');
+                               const parts = val.split('.');
+                               if (parts.length > 2) return;
+                               setVoucherAmount(val);
+                             }}
+                             className="w-full bg-black/40 border border-white/5 rounded-xl px-3 py-1 text-xs text-emerald-400 font-bold font-mono outline-none focus:border-amber-500/50 placeholder:text-gray-800 text-left"
+                             required
+                           />
+                           {selectedCurrency && (
+                             <span className="absolute right-3 top-1 text-[9px] text-gray-500 font-bold">{selectedCurrency}</span>
+                           )}
+                        </div>
+                     </div>
+
+                     {/* 6. صرف الدفع + 7. المبلغ المسدد */}
+                     <div className="flex flex-col gap-2 py-2 border-b border-white/5">
+                       <div className="grid grid-cols-2 gap-2">
+                         <div>
+                           <label className="block text-[9px] text-gray-400 font-bold mb-1 font-cairo text-center">
+                             صرف الدفع
+                           </label>
+                           <input
+                             type="text"
+                             inputMode="decimal"
+                             dir="ltr"
+                             lang="en"
+                             value={selectedCurrency === liabilityCurrency ? '1' : voucherExchangeRate}
+                             disabled={selectedCurrency === liabilityCurrency || !selectedCurrency || !liabilityCurrency}
+                             onFocus={e => e.target.select()}
+                             onChange={(e) => {
+                               const val = e.target.value.replace(/[^0-9.]/g, '');
+                               const parts = val.split('.');
+                               if (parts.length > 2) return;
+                               setVoucherExchangeRate(val);
+                             }}
+                             className="w-full h-9 bg-black/40 border border-white/10 rounded-xl px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-blue-500 text-center text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                             placeholder="1.00"
+                           />
+                         </div>
+                         <div>
+                           <label className="block text-[9px] text-blue-400 font-bold mb-1 font-cairo text-center">
+                             المبلغ المسدد بالذمة
+                           </label>
+                           <div className="w-full h-9 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center text-center font-mono text-xs font-black text-blue-300" dir="ltr">
+                             {(() => {
+                               if (selectedCurrency === liabilityCurrency) return (parseFloat(voucherAmount) || 0).toFixed(2);
+                               const rate = parseFloat(voucherExchangeRate) || 1;
+                               return rate > 0 ? ((parseFloat(voucherAmount) || 0) / rate).toFixed(2) : '0.00';
+                             })()}
+                           </div>
+                         </div>
+                       </div>
+                     </div>
+
+                     {/* Bank specific fields */}
+                     {(() => {
+                        const matchedFund = funds.find(f => f.id === selectedFundId);
+                        if (matchedFund && matchedFund.type !== 'cash') {
+                          return (
+                            <>
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-4 py-1 border-b border-white/5">
+                                 <label className="text-[11px] font-bold text-gray-400 min-w-[120px]">
+                                   اسم المودع الشخصي:
+                                 </label>
+                                 <input 
+                                   type="text"
+                                   placeholder="أدخل اسم مودع المبلغ بالكامل..."
+                                   value={depositorName}
+                                   onFocus={handleInputFocus} onChange={(e) => setDepositorName(e.target.value)}
+                                   className="flex-1 max-w-xs bg-black/40 border border-white/5 rounded-xl px-3 py-1 text-xs text-white outline-none focus:border-amber-500/50"
+                                   required
+                                 />
+                              </div>
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-4 py-1 border-b border-white/5">
+                                 <label className="text-[11px] font-bold text-gray-400 min-w-[120px]">
+                                   رقم المرجع البنكي:
+                                 </label>
+                                 <input 
+                                   type="text"
+                                   placeholder="أدخل رقم المرجع أو الشيك..."
+                                   value={referenceNumber}
+                                   onFocus={handleInputFocus} onChange={(e) => setReferenceNumber(e.target.value)}
+                                   className="flex-1 max-w-xs bg-black/40 border border-white/5 rounded-xl px-3 py-1 text-xs text-white outline-none focus:border-amber-500/50 font-mono text-left"
+                                   required
+                                 />
+                              </div>
+                            </>
+                          );
+                        }
+                        return null;
+                     })()}
+
+                     {/* 10. ملاحظات السند */}
+                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-4 py-1">
+                        <label className="text-[11px] font-bold text-gray-400 min-w-[120px]">
+                          البيان والملاحظات:
+                        </label>
+                        <input 
+                          type="text"
+                          placeholder="أدخل ملاحظات السند..."
+                          value={voucherNotes}
+                          onFocus={handleInputFocus} onChange={(e) => setVoucherNotes(e.target.value)}
+                          className="flex-1 max-w-xs bg-black/40 border border-white/5 rounded-xl px-3 py-1 text-xs text-white outline-none focus:border-amber-500/50"
+                        />
+                     </div>
+                  </div>
+
+                  {/* Form Actions */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-4 border-t border-white/5 max-w-xl mx-auto gap-3">
+                     <button 
+                        onClick={() => {
+                          setShowAddModal(false);
+                          resetForm();
+                        }}
+                        className="p-2.5 bg-white/5 hover:bg-red-500/10 text-gray-400 hover:text-red-500 rounded-xl transition-all active:scale-95 border border-white/5 flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer"
+                        title="رجوع وإلغاء"
+                     >
+                        <ArrowRight size={20} className="sm:block hidden" />
+                        <span className="sm:hidden font-bold font-cairo text-xs">رجوع وإلغاء</span>
+                     </button>
+                     
+                     <button 
+                       onClick={() => setShowPrintPreview(true)}
+                       disabled={!isFormValid()}
+                       className={`flex items-center justify-center gap-1.5 px-8 py-2.5 rounded-xl font-bold font-cairo text-xs text-white transition-all shadow-md active:scale-95 w-full sm:w-auto cursor-pointer ${!isFormValid() ? 'bg-gray-700 cursor-not-allowed opacity-50' : 'bg-amber-600 hover:bg-amber-500 text-black font-black'}`}
+                     >
+                        <Eye size={14} />
+                        إجراء معاينة للمراجعة
+                     </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TRANSFER FUNDS VIEW */}
+          {activeSegment === 'transfer' && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="flex items-center gap-3 border-b border-white/5 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/10 rounded-xl text-blue-400">
+                    <ArrowRightLeft size={18} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-black text-white font-cairo leading-none">التحويل بين الصناديق</h2>
+                    <p className="text-[10px] text-gray-400 font-cairo mt-1">نقل الأموال بين الصناديق المختلفة بنفس العملة</p>
+                  </div>
+                </div>
+              </div>
+
+              <form onSubmit={handlePostTransfer} className="bg-[#141414] border border-white/5 rounded-2xl p-4 sm:p-5">
+                <div className="max-w-xl mx-auto space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Source Fund */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-gray-400 font-cairo flex items-center gap-1.5">
+                        <Wallet size={12} className="text-rose-400" />
+                        الصندوق المُحول منه (الرصيد يقل)
+                      </label>
+                      <select
+                        value={transferSourceFundId}
+                        onChange={(e) => setTransferSourceFundId(e.target.value)}
+                        className="w-full bg-[#101010] border border-white/10 rounded-xl px-3 py-2 text-[11px] font-cairo text-white focus:border-blue-500/50 outline-none transition-all"
+                        required
+                      >
+                        <option value="" disabled className="text-gray-600">اختر الصندوق المصدر...</option>
+                        {funds.filter(f => f.status === 'active').map(f => (
+                          <option key={f.id} value={f.id} className="bg-[#1c1c1c]">{f.name} ({f.currency}) - الرصيد: {f.balance?.toLocaleString('en-US')}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Destination Fund */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-gray-400 font-cairo flex items-center gap-1.5">
+                        <Wallet size={12} className="text-emerald-400" />
+                        الصندوق المُحول إليه (الرصيد يزداد)
+                      </label>
+                      <select
+                        value={transferDestFundId}
+                        onChange={(e) => setTransferDestFundId(e.target.value)}
+                        className="w-full bg-[#101010] border border-white/10 rounded-xl px-3 py-2 text-[11px] font-cairo text-white focus:border-blue-500/50 outline-none transition-all"
+                        required
+                      >
+                        <option value="" disabled className="text-gray-600">اختر الصندوق الوجهة...</option>
+                        {funds.filter(f => f.status === 'active').map(f => (
+                          <option key={f.id} value={f.id} className="bg-[#1c1c1c]">{f.name} ({f.currency}) - الرصيد: {f.balance?.toLocaleString('en-US')}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-gray-400 font-cairo">المبلغ المراد تحويله</label>
+                    <div className="relative">
+                      <input 
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        dir="ltr"
+                        lang="en"
+                        onFocus={e => { e.target.select(); handleInputFocus(e); }}
+                        value={transferAmount}
+                        onChange={(e) => setTransferAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full bg-[#101010] border border-white/10 rounded-xl px-3 py-2 text-base font-mono font-bold text-blue-400 focus:border-blue-500/50 outline-none transition-all text-center"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 py-2 border-t border-white/5 mt-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[9px] text-gray-400 font-bold mb-1 font-cairo text-center">
+                          صرف التحويل
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          dir="ltr"
+                          lang="en"
+                          value={(() => {
+                            const src = funds.find(f => f.id === transferSourceFundId);
+                            const dest = funds.find(f => f.id === transferDestFundId);
+                            return (src && dest && src.currency === dest.currency) ? '1' : transferExchangeRate;
+                          })()}
+                          disabled={(() => {
+                            const src = funds.find(f => f.id === transferSourceFundId);
+                            const dest = funds.find(f => f.id === transferDestFundId);
+                            return !src || !dest || src.currency === dest.currency;
+                          })()}
+                          onFocus={e => e.target.select()}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9.]/g, '');
+                            const parts = val.split('.');
+                            if (parts.length > 2) return;
+                            setTransferExchangeRate(val);
+                          }}
+                          className="w-full h-9 bg-black/40 border border-white/10 rounded-xl px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-blue-500 text-center text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                          placeholder="1.00"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] text-blue-400 font-bold mb-1 font-cairo text-center">
+                          المعادل بالوجهة
+                        </label>
+                        <div className="w-full h-9 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center text-center font-mono text-xs font-black text-blue-300" dir="ltr">
+                          {(() => {
+                            const src = funds.find(f => f.id === transferSourceFundId);
+                            const dest = funds.find(f => f.id === transferDestFundId);
+                            if (src && dest && src.currency === dest.currency) return (parseFloat(transferAmount) || 0).toFixed(2);
+                            const rate = parseFloat(transferExchangeRate) || 1;
+                            return rate > 0 ? ((parseFloat(transferAmount) || 0) / rate).toFixed(2) : '0.00';
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-gray-400 font-cairo flex items-center gap-1.5">
+                      <FileText size={12} />
+                      البيان / ملاحظات التحويل
+                    </label>
+                    <textarea 
+                      value={transferNotes}
+                      onChange={(e) => setTransferNotes(e.target.value)}
+                      placeholder="أدخل سبب أو ملاحظات التحويل (اختياري)..."
+                      className="w-full bg-[#101010] border border-white/10 rounded-xl px-3 py-2 text-[11px] font-cairo text-white focus:border-blue-500/50 outline-none transition-all resize-none h-16"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end">
+                    <button 
+                      type="submit"
+                      disabled={isPosting || !transferSourceFundId || !transferDestFundId || !transferAmount || parseFloat(transferAmount) <= 0}
+                      className="flex items-center gap-1.5 px-6 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold font-cairo transition-all active:scale-95 shadow-lg shadow-blue-500/20"
+                    >
+                      {isPosting ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                      تنفيذ التحويل المالي
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* 2. BOX FUNDS REAL-TIME OVERLAY */}
+          {activeSegment === 'funds' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => setActiveSegment('dashboard')}
+                    className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white transition-all ml-2"
+                  >
+                    <ArrowRight size={20} />
+                  </button>
+                  <div>
+                    <h3 className="text-xl font-black text-white font-cairo flex items-center gap-2">
+                      <Wallet className="text-blue-400" size={22} />
+                      أرصدة وحركات الصناديق المالية
+                    </h3>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="relative group flex-1 sm:flex-none sm:w-64">
+                    <Search className="absolute right-3 top-2.5 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={16} />
+                    <input 
+                      type="text" 
+                      placeholder="بحث في الصناديق والحركات..."
+                      value={globalSearch}
+                      onChange={(e) => setGlobalSearch(e.target.value)}
+                      className="w-full bg-[#181818] border border-white/5 rounded-xl pr-10 pl-4 py-2 text-xs font-cairo text-white outline-none focus:border-blue-500/50 transition-all"
+                    />
+                  </div>
+                  {/* Add New Fund / Movement Button */}
+                  <button 
+                    onClick={() => {
+                        // For simplicity, we trigger the payment/receipt modal if they need to add money
+                        // Or we can just show a message. But to follow the pattern:
+                        setActiveSegment('receipt');
+                        setShowAddModal(true);
+                    }}
+                    className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-lg shadow-blue-900/20 active:scale-95"
+                    title="إضافة حركة نقدية جديدة"
+                  >
+                    <Plus size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {funds.map((fund) => {
+                  const fundTxs = transactions.filter(t => t.fundId === fund.id);
+                  const inSum = fundTxs.filter(t => t.type === 'receipt').reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0);
+                  const outSum = fundTxs.filter(t => t.type === 'payment').reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0);
+
+                  return (
+                    <div key={fund.id} className="bg-[#181818] border border-white/5 rounded-2xl p-5 flex flex-col justify-between gap-4 hover:border-blue-500/30 transition-all group">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-black text-white font-cairo">{fund.name}</h4>
+                          <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black ${fund.type === 'cash' ? 'bg-amber-500/15 text-amber-500' : 'bg-blue-500/15 text-blue-400'}`}>
+                            {fund.type === 'cash' ? 'نقدي' : 'بنك'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-500 font-cairo mt-1">{fund.description || 'لا يوجد وصف للمجمع التلقائي للمال.'}</p>
+                      </div>
+
+                      <div className="bg-[#121212] p-3 rounded-xl border border-white/5 grid grid-cols-2 gap-2 text-center">
+                        <div>
+                          <p className="text-[9px] text-gray-500 font-cairo leading-none">مجموع الواردات</p>
+                          <p className="font-mono text-xs font-bold text-green-400 mt-1">+{inSum.toLocaleString('en-US')}</p>
+                        </div>
+                        <div className="border-r border-white/5">
+                          <p className="text-[9px] text-gray-500 font-cairo leading-none">مجموع النفقات</p>
+                          <p className="font-mono text-xs font-bold text-red-500 mt-1">-{outSum.toLocaleString('en-US')}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between border-t border-white/5 pt-3">
+                        <span className="text-xs text-gray-400 font-cairo">متوفر حالياً بالصندوق:</span>
+                        <span className="font-mono text-lg font-black text-emerald-400">
+                          {fund.balance?.toLocaleString('en-US')} <span className="text-[11px] font-sans text-gray-500">{fund.currency}</span>
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Fund Movements Table below boxes */}
+              <div className="mt-8 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest font-cairo mr-1">سجل حركات الصناديق الأخيرة</h4>
+                  <div className="relative">
+                    <button 
+                      onClick={() => setShowFundTxSort(!showFundTxSort)}
+                      className="p-2 bg-white/5 border border-white/5 rounded-lg text-gray-400 hover:text-white transition-all flex items-center gap-1.5"
+                    >
+                       <span className="text-[10px] font-bold font-cairo sm:block hidden">ترتيب وفرز</span>
+                       <ArrowUpDown size={14} />
+                    </button>
+                    {showFundTxSort && (
+                       <div className="absolute z-50 left-0 mt-2 bg-[#1f1f1f] border border-white/10 rounded-xl shadow-2xl p-1.5 w-48">
+                         <button onClick={() => { setVoucherSortConfig({ key: 'date', direction: 'desc' }); setShowFundTxSort(false); }} className="w-full text-right px-3 py-1.5 text-[10px] hover:bg-blue-600 hover:text-white text-slate-300 rounded font-bold font-cairo transition-colors">حسب التاريخ (الأحدث)</button>
+                         <button onClick={() => { setVoucherSortConfig({ key: 'alpha', direction: 'asc' }); setShowFundTxSort(false); }} className="w-full text-right px-3 py-1.5 text-[10px] hover:bg-blue-600 hover:text-white text-slate-300 rounded font-bold font-cairo transition-colors">حسب الصندوق (أ - ي)</button>
+                         <button onClick={() => { setVoucherSortConfig({ key: 'alpha', direction: 'desc' }); setShowFundTxSort(false); }} className="w-full text-right px-3 py-1.5 text-[10px] hover:bg-blue-600 hover:text-white text-slate-300 rounded font-bold font-cairo transition-colors">حسب الصندوق (ي - أ)</button>
+                         <button onClick={() => { setVoucherSortConfig({ key: 'category', direction: 'asc' }); setShowFundTxSort(false); }} className="w-full text-right px-3 py-1.5 text-[10px] hover:bg-blue-600 hover:text-white text-slate-300 rounded font-bold font-cairo transition-colors">حسب نوع الحركة</button>
+                         <button onClick={() => { setVoucherSortConfig({ key: 'amount', direction: 'desc' }); setShowFundTxSort(false); }} className="w-full text-right px-3 py-1.5 text-[10px] hover:bg-blue-600 hover:text-white text-slate-300 rounded font-bold font-cairo transition-colors">المبلغ (الأكبر)</button>
+                         <button onClick={() => { setVoucherSortConfig({ key: 'amount', direction: 'asc' }); setShowFundTxSort(false); }} className="w-full text-right px-3 py-1.5 text-[10px] hover:bg-blue-600 hover:text-white text-slate-300 rounded font-bold font-cairo transition-colors">المبلغ (الأصغر)</button>
+                       </div>
+                    )}
+                  </div>
+                </div>
+                <div className="border border-white/5 rounded-2xl overflow-auto bg-black/20 max-h-96 scrollbar-thin">
+                  <table className="w-full text-right text-[10px] whitespace-nowrap min-w-[600px]">
+                    <thead>
+                      <tr className="bg-white/5 text-gray-500 font-black border-b border-white/5">
+                        <th className="px-4 py-3">الصندوق</th>
+                        <th className="px-4 py-3">التاريخ</th>
+                        <th className="px-4 py-3">نوع الحركة</th>
+                        <th className="px-4 py-3 text-center">المبلغ</th>
+                        <th className="px-4 py-3 text-left">التفاصيل</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {currentVaultTransactions.map(tx => (
+                        <tr key={tx.id} className="hover:bg-white/5 bg-[#141414] transition-colors">
+                          <td className="px-4 py-3 font-bold text-gray-300">{getFundDisplayName(tx)}</td>
+                          <td className="px-4 py-3 text-gray-500 font-mono">
+                            {formatTxDate(tx)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${tx.type === 'receipt' ? 'bg-green-600/15 text-green-400' : 'bg-amber-600/15 text-amber-500'}`}>
+                              {tx.type === 'receipt' ? 'إيداع' : 'سحب'}
+                            </span>
+                          </td>
+                          <td className={`px-4 py-3 text-center font-bold ${tx.type === 'receipt' ? 'text-green-400' : 'text-red-500'}`}>
+                            {tx.amount?.toLocaleString('en-US')} {tx.currency}
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 text-left truncate max-w-[180px]">{tx.notes || 'حركة نقدية.'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination Controls */}
+                {totalVaultPages > 1 && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-white/5 bg-black/10 rounded-xl">
+                    <span className="text-[10px] text-gray-500 font-bold font-cairo">
+                      عرض {((safeVaultCurrentPage - 1) * itemsPerPage) + 1} إلى {Math.min(safeVaultCurrentPage * itemsPerPage, filteredVaultTransactions.length)} من أصل {filteredVaultTransactions.length} حركة
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={safeVaultCurrentPage === 1}
+                        className="p-1.5 rounded-lg bg-white/5 text-gray-400 disabled:opacity-30 hover:bg-white/10 transition-colors cursor-pointer"
+                      >
+                        <ArrowLeft size={14} className="rotate-180" />
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(totalVaultPages, p + 1))}
+                        disabled={safeVaultCurrentPage === totalVaultPages}
+                        className="p-1.5 rounded-lg bg-white/5 text-gray-400 disabled:opacity-30 hover:bg-white/10 transition-colors cursor-pointer"
+                      >
+                        <ArrowLeft size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 3. CLIENT STATEMENT LEDGERS */}
+          {activeSegment === 'customer-ledger' && (
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => setActiveSegment('dashboard')}
+                    className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white transition-all ml-2 cursor-pointer active:scale-95"
+                  >
+                    <ArrowRight size={20} />
+                  </button>
+                  <div>
+                    <h3 className="text-xl font-black text-white font-cairo flex items-center gap-2">
+                      <Users className="text-purple-400" size={22} />
+                      كشف حسابات العملاء والديون
+                    </h3>
+                    <p className="text-[10px] sm:text-xs text-gray-400 font-cairo mt-0.5">مراقبة كشوفات الحسابات الشاملة وتحصيل الديون المترتبة على العملاء.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 relative">
+                  <div className="relative group flex-1 sm:flex-none sm:w-96">
+                    <Search className="absolute right-3 top-2.5 text-gray-500 group-focus-within:text-purple-500 transition-colors" size={16} />
+                    <input 
+                      type="text" 
+                      placeholder="ابحث باسم العميل أو الشركة أو الهاتف..."
+                      value={ledgerSearchTerm}
+                      onChange={(e) => {
+                        setLedgerSearchTerm(e.target.value);
+                        setLedgerListPage(1); // Reset page on search
+                      }}
+                      className="w-full bg-[#181818] border border-white/5 rounded-xl pr-10 pl-4 py-2 text-xs font-cairo text-white outline-none focus:border-purple-500/50 transition-all font-bold"
+                    />
+
+                    {/* Auto-suggest Autocomplete Dropdown */}
+                    {ledgerSearchTerm.trim() !== '' && (
+                      <div className="absolute right-0 left-0 mt-2 bg-[#121212] border border-white/10 rounded-2xl shadow-2xl z-[90] max-h-64 overflow-y-auto divide-y divide-white/5 font-cairo">
+                        {customers
+                          .filter(c => 
+                            c.name.toLowerCase().includes(ledgerSearchTerm.toLowerCase()) || 
+                            (c.companyName && c.companyName.toLowerCase().includes(ledgerSearchTerm.toLowerCase())) || 
+                            (c.phone1 && c.phone1.includes(ledgerSearchTerm))
+                          )
+                          .slice(0, 8)
+                          .map(cust => {
+                            const unpaid = getCustomerUnpaidBalance(cust.id);
+                            return (
+                              <div
+                                key={cust.id}
+                                onClick={() => {
+                                  setLedgerCustomerId(cust.id);
+                                  setIsLedgerModalOpen(true);
+                                  setLedgerSearchTerm(''); // clear search
+                                }}
+                                className="p-3 hover:bg-purple-600/10 cursor-pointer flex items-center justify-between text-right transition-colors"
+                              >
+                                <div className="text-right">
+                                  <span className="text-xs font-bold text-white block">{cust.name}</span>
+                                  {cust.companyName && <span className="text-[10px] text-gray-400 block">{cust.companyName}</span>}
+                                </div>
+                                <div className="text-left font-mono">
+                                  <span className={`text-[9px] px-2 py-0.5 rounded font-black ${unpaid > 0.01 ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                                    {unpaid > 0.01 ? `${unpaid.toFixed(2)} USD` : 'خالٍ من الديون'}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        }
+                        {customers.filter(c => 
+                          c.name.toLowerCase().includes(ledgerSearchTerm.toLowerCase()) || 
+                          (c.companyName && c.companyName.toLowerCase().includes(ledgerSearchTerm.toLowerCase())) || 
+                          (c.phone1 && c.phone1.includes(ledgerSearchTerm))
+                        ).length === 0 && (
+                          <div className="p-4 text-center text-gray-500 text-xs font-bold font-cairo">لا توجد نتائج مطابقة لبحثك.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add New Customer Button Removed per user request */}
+                </div>
+              </div>
+
+              {/* Bento Quick Debt Stats cards */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="bg-[#181818] p-3 sm:p-4 rounded-2xl border border-white/5 flex items-center gap-3">
+                  <div className="p-2 sm:p-3 bg-purple-600/10 rounded-xl text-purple-400 shrink-0">
+                    <Users size={20} className="sm:w-[22px] sm:h-[22px]" />
+                  </div>
+                  <div>
+                    <span className="text-[9px] sm:text-[10px] text-gray-500 font-cairo block leading-none">النشطون</span>
+                    <span className="font-mono text-sm sm:text-lg font-black text-white mt-1 block">{customers.length}</span>
+                  </div>
+                </div>
+
+                <div className="bg-[#181818] p-3 sm:p-4 rounded-2xl border border-white/5 flex items-center gap-3">
+                  <div className="p-2 sm:p-3 bg-red-600/10 rounded-xl text-red-400 shrink-0">
+                    <TrendingDown size={20} className="sm:w-[22px] sm:h-[22px]" />
+                  </div>
+                  <div>
+                    <span className="text-[9px] sm:text-[10px] text-gray-500 font-cairo block leading-none">المدينون</span>
+                    <span className="font-mono text-sm sm:text-lg font-black text-rose-500 mt-1 block">
+                      {new Set(customerStats.filter(stat => stat.unpaidBalance > 0.01).map(stat => stat.customer.id)).size}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="col-span-2 md:col-span-1 bg-[#181818] p-3 sm:p-4 rounded-2xl border border-white/5 flex items-center gap-3">
+                  <div className="p-2 sm:p-3 bg-amber-600/10 rounded-xl text-amber-400 shrink-0">
+                    <Coins size={20} className="sm:w-[22px] sm:h-[22px]" />
+                  </div>
+                  <div>
+                    <span className="text-[9px] sm:text-[10px] text-gray-500 font-cairo block leading-none">إجمالي الديون المعلقة</span>
+                    <span className="font-mono text-[10px] sm:text-xs md:text-sm font-black text-amber-500 mt-1 block flex flex-wrap gap-1 leading-tight">
+                      {Object.entries(
+                        customerStats.reduce((acc, stat) => {
+                          if (stat.unpaidBalance > 0.01) {
+                            acc[stat.currency] = (acc[stat.currency] || 0) + stat.unpaidBalance;
+                          }
+                          return acc;
+                        }, {} as Record<string, number>)
+                      ).map(([curr, amount], idx, arr) => (
+                        <span key={curr}>
+                          {(amount as number).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[8px] sm:text-[9px] text-gray-400">{curr}</span>
+                          {idx < arr.length - 1 && <span className="mx-1 text-gray-600">|</span>}
+                        </span>
+                      ))}
+                      {customerStats.filter(stat => stat.unpaidBalance > 0.01).length === 0 && '0.00'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Structured Customer Debt Table */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                  <h4 className="text-xs font-black text-white font-cairo flex items-center gap-2">
+                    <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+                    سجل ديون العملاء ({filteredLedgerStats.length})
+                  </h4>
+                  {ledgerSearchTerm && (
+                    <button 
+                      onClick={() => setLedgerSearchTerm('')}
+                      className="text-[10px] text-purple-400 font-bold hover:underline font-cairo"
+                    >
+                      مسح التصفية
+                    </button>
+                  )}
+                </div>
+
+                <div className="bg-[#121212] border border-white/5 rounded-2xl overflow-hidden shadow-xl text-xs w-full">
+                  <div className="w-full">
+                    <table className="w-full border-collapse text-right table-fixed">
+                      <thead>
+                        <tr className="bg-white/[0.03] border-b border-white/5 text-gray-400 font-cairo font-bold text-[9px] sm:text-[11px]">
+                          <th className="py-2 sm:py-3 px-2 sm:px-4 w-[35%]">العميل</th>
+                          <th className="py-2 sm:py-3 px-2 sm:px-4 hidden md:table-cell w-[15%]">الهاتف</th>
+                          <th className="py-2 sm:py-3 px-2 sm:px-4 hidden lg:table-cell w-[15%]">آخر نشاط</th>
+                          <th className="py-2 sm:py-3 px-2 sm:px-4 w-[35%]">صافي الدين</th>
+                          <th className="py-2 sm:py-3 px-2 sm:px-4 text-center w-[15%] sm:w-28">إجراء</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 text-gray-300 font-mono">
+                        {currentLedgerListStats.map((stat, idx) => {
+                          const hasDebt = stat.unpaidBalance > 0.01;
+                          return (
+                            <tr 
+                              key={`${stat.customer.id}-${stat.currency}` || idx} 
+                              onClick={() => {
+                                setLedgerCustomerId(stat.customer.id);
+                                setLedgerCurrency(stat.currency);
+                                setIsLedgerModalOpen(true);
+                              }}
+                              className="hover:bg-white/[0.03] transition-colors cursor-pointer group"
+                            >
+                              {/* Customer Name */}
+                              <td className="py-2 sm:py-3 px-2 sm:px-4 text-right overflow-hidden max-w-[120px] sm:max-w-[200px]">
+                                <span className="font-bold text-white block group-hover:text-purple-400 transition-colors font-cairo text-xs sm:text-sm truncate">
+                                  {stat.customer.name}
+                                </span>
+                                {stat.customer.companyName && (
+                                  <span className="text-[9px] text-gray-500 block font-cairo mt-0.5 truncate">
+                                    {stat.customer.companyName}
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Phone */}
+                              <td className="py-2 sm:py-3 px-2 sm:px-4 text-right font-mono text-[11px] text-gray-400 hidden md:table-cell">
+                                {stat.customer.phone1 ? (
+                                  <span className="flex items-center gap-1.5 justify-start truncate">
+                                    <Phone size={12} className="text-gray-600 shrink-0" />
+                                    <span className="truncate">{stat.customer.phone1}</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-600 font-cairo">لا يوجد</span>
+                                )}
+                              </td>
+
+                              {/* Last Activity */}
+                              <td className="py-2 sm:py-3 px-2 sm:px-4 text-right font-cairo text-xs text-gray-400 hidden lg:table-cell">
+                                {stat.lastActivityDate ? (
+                                  <span className="font-mono text-[11px] text-gray-300 font-bold block truncate">
+                                    {stat.lastActivityDate.toLocaleDateString('ar-YE', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-600 font-bold text-[10px] truncate">بدون حركة</span>
+                                )}
+                              </td>
+
+                              {/* Outstanding Debt */}
+                              <td className="py-2 sm:py-3 px-2 sm:px-4 text-right font-mono">
+                                <span className={`inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black truncate max-w-full ${hasDebt ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                                  {hasDebt ? `${stat.unpaidBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${stat.currency}` : 'خالٍ من المديونية'}
+                                </span>
+                              </td>
+
+                              {/* Action */}
+                              <td className="py-2 sm:py-3 px-1 sm:px-4 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => {
+                                    setLedgerCustomerId(stat.customer.id);
+                                    setLedgerCurrency(stat.currency);
+                                    setIsLedgerModalOpen(true);
+                                  }}
+                                  className="px-2 sm:px-3 py-1.5 bg-purple-600/10 hover:bg-purple-600 text-purple-400 hover:text-white rounded-lg transition-all border border-purple-500/20 text-[9px] sm:text-[10px] font-black cursor-pointer inline-flex items-center justify-center gap-1 hover:scale-105 active:scale-95 w-full sm:w-auto"
+                                >
+                                  <Eye size={12} className="shrink-0" />
+                                  <span className="hidden sm:inline">كشف الحساب</span>
+                                  <span className="sm:hidden">كشف</span>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+
+                        {currentLedgerListStats.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="text-center py-10 text-gray-500 font-cairo font-bold text-xs">لا يوجد عملاء مطابقين لخيارات البحث المحددة.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Main List Pagination */}
+                  {totalLedgerListPages > 1 && (
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-white/5 bg-white/[0.01]">
+                      <span className="text-[10px] text-gray-400 font-bold font-cairo">
+                        عرض الصفحة {safeLedgerListPage} من {totalLedgerListPages} (إجمالي {filteredLedgerStats.length} عميل)
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setLedgerListPage(p => Math.max(1, p - 1))}
+                          disabled={safeLedgerListPage === 1}
+                          className="p-1.5 rounded-lg bg-white/5 text-gray-400 disabled:opacity-30 hover:bg-white/10 transition-colors cursor-pointer"
+                        >
+                          <ArrowLeft size={14} className="rotate-180" />
+                        </button>
+                        <button
+                          onClick={() => setLedgerListPage(p => Math.min(totalLedgerListPages, p + 1))}
+                          disabled={safeLedgerListPage === totalLedgerListPages}
+                          className="p-1.5 rounded-lg bg-white/5 text-gray-400 disabled:opacity-30 hover:bg-white/10 transition-colors cursor-pointer"
+                        >
+                          <ArrowLeft size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 4. FINANCIAL REPORTS VIEW */}
+          {activeSegment === 'reports' && (
+            <div className="space-y-4 animate-fade-in">
+              
+              {/* Report Category Header */}
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => setActiveSegment('dashboard')}
+                    className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-all"
+                    title="العودة لشجرة النظام المالي"
+                  >
+                    <ArrowRight size={16} />
+                  </button>
+                  <h3 className="text-sm md:text-base font-bold text-white font-cairo flex items-center gap-2">
+                    <FileSpreadsheet className="text-emerald-400" size={16} />
+                    <span>تقارير الحسابات المالية:</span>
+                    <span className="text-amber-500 font-bold">
+                      {reportSubSegment === 'revenues' && 'الإيرادات والنقود الواردة'}
+                      {reportSubSegment === 'expenses' && 'المصروفات والمبالغ الصادرة'}
+                      {reportSubSegment === 'profits' && 'الأرباح وصافي الميزان'}
+                      {reportSubSegment === 'fund-balances' && 'رصيد ومحتويات الصناديق'}
+                      {reportSubSegment === 'outstanding-debts' && 'سجل الديون والمديونيات المستحقة'}
+                    </span>
+                  </h3>
+                </div>
+              </div>
+
+              {/* SECTION: REVENUES (وارد) */}
+              {reportSubSegment === 'revenues' && (
+                <div className="space-y-3">
+                  {/* Currencies stats */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {allUsedCurrencies.map(curr => {
+                      const sum = revenueCurrencyTotals[curr] || 0;
+                      return (
+                        <div key={curr} className="bg-green-600/10 border border-green-500/15 p-3 rounded-xl flex items-center justify-between">
+                          <span className="text-[10px] sm:text-[11px] text-green-400 font-cairo font-bold">وارد الإيرادات المتراكمة</span>
+                          <p className="font-mono text-base md:text-lg font-black text-white">{sum.toLocaleString('en-US')} <span className="text-[10px] text-green-400">{curr}</span></p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Vouchers Receipt ledger list */}
+                  <div className="bg-[#141414] border border-white/5 rounded-xl overflow-hidden">
+                    <div className="bg-white/5 px-3 py-2 font-cairo font-bold text-[11px] text-white">سندات القبض المسجلة بالدخول:</div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-right border-collapse text-xs min-w-[500px]">
+                        <thead>
+                          <tr className="border-b border-white/5 text-gray-500 font-cairo font-bold bg-[#1a1a1a]">
+                            <th className="py-2 px-3">رقم السند</th>
+                            <th className="py-2 px-3">التاريخ</th>
+                            <th className="py-2 px-3">التصنيف</th>
+                            <th className="py-2 px-3">الجهة المستلمة</th>
+                            <th className="py-2 px-3">الصندوق</th>
+                            <th className="py-2 px-3 text-left">المبلغ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 font-mono text-[11px] text-gray-300">
+                          {receiptTransactions.map(tx => (
+                            <tr key={tx.id} className="hover:bg-white/5 transition-colors">
+                              <td className="py-2 px-3 text-white font-bold">{tx.voucherNumber}</td>
+                              <td className="py-2 px-3 font-sans text-[10px] text-gray-500">{formatTxDate(tx)}</td>
+                              <td className="py-2 px-3 text-emerald-400 font-cairo">{tx.transactionCategory}</td>
+                              <td className="py-2 px-3 font-cairo text-gray-400">{tx.customerName}</td>
+                              <td className="py-2 px-3 font-cairo text-gray-400">{getFundDisplayName(tx)}</td>
+                              <td className="py-2 px-3 text-left font-bold text-green-400 font-mono">+{Math.abs(tx.amount).toLocaleString('en-US')} <span className="text-[9px]">{tx.currency}</span></td>
+                            </tr>
+                          ))}
+                          {receiptTransactions.length === 0 && (
+                            <tr>
+                              <td colSpan={6} className="text-center py-6 text-gray-600 font-cairo font-bold">لا توجد أي سندات مقبوضات حتى الآن.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION: EXPENSES (مصروف) */}
+              {reportSubSegment === 'expenses' && (
+                <div className="space-y-3">
+                  {/* Currencies stats */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {allUsedCurrencies.map(curr => {
+                      const sum = expenseCurrencyTotals[curr] || 0;
+                      return (
+                        <div key={curr} className="bg-red-600/10 border border-red-500/15 p-3 rounded-xl flex items-center justify-between">
+                          <span className="text-[10px] sm:text-[11px] text-red-400 font-cairo font-bold">إجمالي عموم المدفوعات والمصروفات</span>
+                          <p className="font-mono text-base md:text-lg font-black text-white">{sum.toLocaleString('en-US')} <span className="text-[10px] text-red-400">{curr}</span></p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Vouchers payment table */}
+                  <div className="bg-[#141414] border border-white/5 rounded-xl overflow-hidden">
+                    <div className="bg-white/5 px-3 py-2 font-cairo font-bold text-[11px] text-white">سندات الصرف والنفقات المسجلة:</div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-right border-collapse text-xs min-w-[500px]">
+                        <thead>
+                          <tr className="border-b border-white/5 text-gray-500 font-cairo font-bold bg-[#1a1a1a]">
+                            <th className="py-2 px-3">رقم السند</th>
+                            <th className="py-2 px-3">التاريخ</th>
+                            <th className="py-2 px-3">التصنيف المصروف</th>
+                            <th className="py-2 px-3">الصرف لصالح</th>
+                            <th className="py-2 px-3">المصدر (الصندوق)</th>
+                            <th className="py-2 px-3 text-left">المبلغ المنصرف</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 font-mono text-[11px] text-gray-300">
+                          {paymentTransactions.map(tx => (
+                            <tr key={tx.id} className="hover:bg-white/5 transition-colors">
+                              <td className="py-2 px-3 text-white font-bold">{tx.voucherNumber}</td>
+                              <td className="py-2 px-3 font-sans text-[10px] text-gray-500">{formatTxDate(tx)}</td>
+                              <td className="py-2 px-3 text-amber-500 font-cairo">{tx.transactionCategory}</td>
+                              <td className="py-2 px-3 font-cairo text-gray-400">{tx.customerName}</td>
+                              <td className="py-2 px-3 font-cairo text-gray-400">{getFundDisplayName(tx)}</td>
+                              <td className="py-2 px-3 text-left font-bold text-red-400 font-mono">-{Math.abs(tx.amount).toLocaleString('en-US')} <span className="text-[9px]">{tx.currency}</span></td>
+                            </tr>
+                          ))}
+                          {paymentTransactions.length === 0 && (
+                            <tr>
+                              <td colSpan={6} className="text-center py-6 text-gray-600 font-cairo font-bold">لا توجد أي نفقات أو سندات صرف حتى الآن.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION: PROFITS (صافي الميزان) */}
+              {reportSubSegment === 'profits' && (
+                <div className="space-y-3">
+                  <p className="text-[11px] text-gray-400 font-cairo">صافي الربح يتم احتسابه بطرح إجمالي النفقات والمصروفات من إجمالي النقدية الواردة عبر السندات والفواتير المدمجة.</p>
+
+                  <div className="space-y-2">
+                    {allUsedCurrencies.map(curr => {
+                      const totalIn = revenueCurrencyTotals[curr] || 0;
+                      const totalOut = expenseCurrencyTotals[curr] || 0;
+                      const netProfit = totalIn - totalOut;
+                      
+                      return (
+                        <div key={curr} className="bg-[#141414] border border-white/5 rounded-xl p-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                          <div className="space-y-1">
+                            <span className="text-[11px] font-bold text-white font-cairo">مؤشر أرباح عملة: {curr}</span>
+                            <div className="flex gap-4 text-[10px] text-gray-500 font-cairo">
+                              <span>إجمالي الوارد: <strong className="text-emerald-400 font-mono">{totalIn}</strong></span>
+                              <span>إجمالي المنصرف: <strong className="text-red-500 font-mono">{totalOut}</strong></span>
+                            </div>
+                          </div>
+
+                          <div className="text-left mt-2 md:mt-0 flex items-center gap-3">
+                            <span className="text-[10px] text-gray-500 font-cairo">صافي ربح الصندوق</span>
+                            <p className={`font-mono text-base md:text-lg font-black ${netProfit >= 0 ? 'text-emerald-400' : 'text-red-500'}`}>
+                              {netProfit >= 0 ? '+' : ''}{netProfit.toLocaleString('en-US')} <span className="text-[10px] text-gray-500">{curr}</span>
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION: FUND BALANCES (أرصدة الصناديق) */}
+              {reportSubSegment === 'fund-balances' && (
+                <div className="space-y-3">
+                  <div className="bg-[#141414] border border-white/5 rounded-xl overflow-hidden w-full">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-right text-xs min-w-[400px]">
+                        <thead>
+                          <tr className="bg-[#1a1a1a] text-gray-400 font-cairo font-bold border-b border-white/5">
+                            <th className="py-2 px-3">اسم الصندوق المالي</th>
+                            <th className="py-2 px-3">النوع</th>
+                            <th className="py-2 px-3">العملة الأساسية</th>
+                            <th className="py-2 px-3 text-left">الرصيد الفعلي المتوقع</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 text-gray-300 font-mono text-[11px]">
+                          {funds.map(f => (
+                            <tr key={f.id} className="hover:bg-white/5 transition-colors">
+                              <td className="py-2.5 px-3 font-bold font-cairo text-white">{f.name}</td>
+                              <td className="py-2.5 px-3 font-cairo text-gray-400">{f.type === 'cash' ? 'نقدي' : 'حساب بنك'}</td>
+                              <td className="py-2.5 px-3 font-cairo text-gray-400">{f.currency}</td>
+                              <td className="py-2.5 px-3 text-left font-mono font-black text-emerald-400">{f.balance?.toLocaleString('en-US')} <span className="text-[9px]">{f.currency}</span></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION: OUTSTANDING DEBTS (المديونيات) */}
+              {reportSubSegment === 'outstanding-debts' && (
+                <div className="space-y-3">
+                  <p className="text-[11px] text-gray-400 font-cairo">سجل بمطالبات العملاء الذين لديهم فواتير معلقة تفوق مبالغ سدادهم الحالية.</p>
+
+                  <div className="bg-[#141414] border border-white/5 rounded-xl overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-right border-collapse text-xs min-w-[500px]">
+                        <thead>
+                        <tr className="bg-white/5 border-b border-white/5 text-gray-400 font-cairo font-bold">
+                          <th className="py-2.5 px-3">اسم العميل بالكامل</th>
+                          <th className="py-2.5 px-3">اسم الشركة المستهدفة</th>
+                          <th className="py-2.5 px-3">رقم الهاتف للتواصل</th>
+                          <th className="py-2.5 px-3 text-left text-red-400 font-bold">الديون المتبقية لصالحه</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 text-gray-300">
+                        {customers.map(cust => {
+                          const custInvs = invoices.filter(inv => inv.customerId === cust.id);
+                          const totalCost = custInvs.reduce((a, b) => {
+                            const invItems = getInvoiceItemsForInvoice(b.invoiceNumber);
+                            return a + getInvoiceActualCost(invItems, b);
+                          }, 0);
+                          const totalPaid = custInvs.reduce((a, b) => a + Number(b.amountPaid || 0), 0);
+                          const extCollections = transactions
+                            .filter(t => t.customerId === cust.id && t.type === 'receipt' && (!t.invoiceNumber || t.invoiceNumber.trim() === ''))
+                            .reduce((a, b) => a + Math.abs(Number(b.amount || 0)), 0);
+
+                          const unpaid = Math.max(0, totalCost - totalPaid - extCollections);
+                          if (unpaid <= 0) return null; // Only show debtor customers
+
+                          return (
+                            <tr key={cust.id} className="hover:bg-white/5">
+                              <td className="py-2.5 px-3 font-bold font-cairo text-white">{cust.name}</td>
+                              <td className="py-2.5 px-3 font-cairo text-gray-500">{cust.companyName || 'بدون شركة'}</td>
+                              <td className="py-2.5 px-3 font-mono text-gray-400">{cust.phone1 || 'لم يدخل هاتف'}</td>
+                              <td className="py-2.5 px-3 text-left font-bold text-red-500 font-mono flex items-center justify-end gap-3">
+                                {unpaid.toLocaleString('en-US')} USD
+                                <button
+                                  onClick={() => {
+                                    if (!cust.phone1) {
+                                      alert('لا يوجد رقم هاتف مسجل لهذا العميل');
+                                      return;
+                                    }
+                                    
+                                    sendUniversalReminder({
+                                      customerName: cust.name,
+                                      phone: cust.phone1,
+                                      amount: unpaid,
+                                      currency: 'USD',
+                                      hasWhatsapp: cust.hasWhatsapp !== undefined ? cust.hasWhatsapp : true,
+                                      countryCode: shopConfig?.countryCode
+                                    });
+                                  }}
+                                  className="px-3 py-1.5 bg-gradient-to-r from-emerald-600/20 to-teal-600/20 hover:from-emerald-600 hover:to-teal-600 text-emerald-500 hover:text-white rounded-lg transition-all cursor-pointer border border-emerald-500/10 flex items-center gap-1.5 group"
+                                  title="إرسال تذكير سداد"
+                                >
+                                  <MessageCircle size={14} className="group-hover:scale-110 transition-transform" />
+                                  <span className="text-[10px] font-black font-cairo">إرسال تذكير</span>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {customers.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="text-center py-6 text-gray-500 font-cairo">لا يوجد أي عملاء مسجلين بنظام المديونيات.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+
+        </div>
+
+      </div>
+
+      {/* 5. DEDICATED ACCOUNTS STATEMENT DETAIL MODAL */}
+      <AnimatePresence>
+        {isLedgerModalOpen && ledgerCustomerId && selectedLedgerCustomer && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#0e0e0e] overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="w-full h-full flex flex-col py-6 space-y-6 overflow-y-auto text-right text-gray-200"
+              dir="rtl"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/5 pb-4 px-4 md:px-8">
+                <div className="flex items-center gap-4 w-full">
+                  <div className="p-3 bg-purple-600/10 text-purple-400 rounded-xl">
+                    <FileText size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg md:text-xl font-black text-purple-400 font-cairo">
+                      كشف الحساب المالي التفصيلي
+                    </h3>
+                    <h4 className="text-sm md:text-base font-bold text-white font-cairo mt-1">
+                      {selectedLedgerCustomer.name}
+                      {selectedLedgerCustomer.companyName && (
+                        <span className="text-gray-500 mr-2 text-xs">| {selectedLedgerCustomer.companyName}</span>
+                      )}
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsLedgerModalOpen(false);
+                      setLedgerCustomerId('');
+                    }}
+                    className="p-3 bg-white/5 hover:bg-red-500/20 hover:text-red-400 rounded-xl text-gray-400 transition-all cursor-pointer"
+                    title="إغلاق"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Stat boxes inside modal */}
+              <div className="flex flex-col sm:flex-row gap-3 px-2 sm:px-4 md:px-8">
+                <div className="bg-[#141414] p-4 rounded-xl border border-white/5 flex flex-col justify-between flex-1">
+                  <span className="text-[11px] text-gray-500 font-cairo leading-none font-bold">إجمالي فواتير الصيانة</span>
+                  <p className="font-mono text-base md:text-lg font-black text-white mt-2">
+                    {totalInvoicesCost.toLocaleString('en-US')} <span className="text-[10px] font-sans text-gray-500">{ledgerCurrency}</span>
+                  </p>
+                  <span className="text-[9px] text-gray-600 font-cairo mt-1">عدد الفواتير المسجلة: {ledgerCustomerInvoices.length}</span>
+                </div>
+
+                <div className="flex flex-row gap-3 flex-[2]">
+                  <div className="bg-[#141414] p-4 rounded-xl border border-white/5 flex flex-col justify-between flex-1">
+                    <span className="text-[11px] text-green-400 font-cairo leading-none font-bold">مجموع المبالغ المسددة</span>
+                    <p className="font-mono text-base md:text-lg font-black text-green-400 mt-2">
+                      {(totalInvoicesPaid + totalSeparateCollections).toLocaleString('en-US')} <span className="text-[10px] font-sans text-gray-500">{ledgerCurrency}</span>
+                    </p>
+                    <span className="text-[9px] text-gray-500 font-cairo mt-1">فواتير: {totalInvoicesPaid} + قبض مستقل: {totalSeparateCollections}</span>
+                  </div>
+
+                  <div className="bg-[#141414] p-4 rounded-xl border border-white/5 flex flex-col justify-between flex-1">
+                    <span className="text-[11px] text-rose-400 font-cairo leading-none font-bold">صافي المديونية المتبقية</span>
+                    <p className={`font-mono text-base md:text-lg font-black mt-2 ${customerUnpaidBalance > 0.01 ? 'text-rose-500' : 'text-emerald-400'}`}>
+                      {customerUnpaidBalance.toLocaleString('en-US')} <span className="text-[10px] font-sans text-gray-500">{ledgerCurrency}</span>
+                    </p>
+                    <span className="text-[9px] text-gray-600 font-cairo mt-1">مستحق بذمة العميل للمركز</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabs for Invoices vs Transactions */}
+              <div className="flex items-center gap-2 border-b border-white/5 pb-1 px-2 sm:px-4 md:px-8">
+                <button
+                  onClick={() => setLedgerModalTab('invoices')}
+                  className={`px-4 py-2 text-xs font-bold font-cairo border-b-2 transition-all ${ledgerModalTab === 'invoices' ? 'border-purple-500 text-purple-400' : 'border-transparent text-gray-400 hover:text-white'}`}
+                >
+                  دفتر الفواتير والديون ({ledgerCustomerInvoices.length})
+                </button>
+                <button
+                  onClick={() => setLedgerModalTab('transactions')}
+                  className={`px-4 py-2 text-xs font-bold font-cairo border-b-2 transition-all ${ledgerModalTab === 'transactions' ? 'border-purple-500 text-purple-400' : 'border-transparent text-gray-400 hover:text-white'}`}
+                >
+                  حركات السندات والمقبوضات ({ledgerCustomerTransactions.length})
+                </button>
+              </div>
+
+              {/* Modal Active Tab Content */}
+              <div className="flex-1 min-h-[250px] space-y-4">
+                {ledgerModalTab === 'invoices' ? (
+                  <div className="space-y-3">
+                    <div className="bg-[#121212] border-y border-white/5 overflow-x-auto text-xs w-full">
+                      <table className="w-full border-collapse text-right min-w-[600px]">
+                        <thead>
+                          <tr className="bg-white/5 border-b border-white/5 text-gray-400 font-cairo font-bold">
+                            <th className="py-2.5 px-3">رقم الفاتورة</th>
+                            <th className="py-2.5 px-3">تاريخ الفاتورة</th>
+                            <th className="py-2.5 px-3">قيمة الفاتورة</th>
+                            <th className="py-2.5 px-3 text-green-400">المسدد منها</th>
+                            <th className="py-2.5 px-3 text-red-500">المبلغ المتبقي</th>
+                            <th className="py-2.5 px-3 text-center">الحالة</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 text-gray-300 font-mono">
+                          {currentLedgerInvoices.map(inv => {
+                            const invItems = getInvoiceItemsForInvoice(inv.invoiceNumber);
+                            const actualCost = getInvoiceActualCost(invItems, inv);
+                            const unpaid = Math.max(0, actualCost - inv.amountPaid);
+                            return (
+                              <tr key={inv.id} className="hover:bg-white/5 font-mono text-[11px]">
+                                <td className="py-2.5 px-3 text-white font-bold">#{inv.invoiceNumber}</td>
+                                <td className="py-2.5 px-3 text-gray-400">
+                                  {parseDate(inv.createdAt)
+                                    ? parseDate(inv.createdAt)!.toLocaleDateString('ar-YE', { year: 'numeric', month: '2-digit', day: '2-digit' })
+                                    : '---'}
+                                </td>
+                                <td className="py-2.5 px-3">{actualCost?.toLocaleString('en-US')} {inv.currency}</td>
+                                <td className="py-2.5 px-3 text-green-400">{inv.amountPaid?.toLocaleString('en-US')} {inv.currency}</td>
+                                <td className="py-2.5 px-3 text-rose-500 font-bold">{unpaid.toLocaleString('en-US')} {inv.currency}</td>
+                                <td className="py-2.5 px-3 text-center font-cairo">
+                                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${inv.status === 'delivered' ? 'bg-green-600/15 text-green-400' : 'bg-amber-600/15 text-amber-500'}`}>
+                                    {inv.status === 'delivered' ? 'مكتملة ومسلمة' : 'قيد الصيانة'}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {ledgerCustomerInvoices.length === 0 && (
+                            <tr>
+                              <td colSpan={6} className="text-center py-8 text-gray-500 font-cairo text-xs font-bold px-3">لا توجد فواتير صيانة مسجلة لهذا العميل.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination for Invoices */}
+                    {totalLedgerInvoicesPages > 1 && (
+                      <div className="flex items-center justify-between mx-2 px-4 py-2 border border-white/5 bg-black/10 rounded-xl">
+                        <span className="text-[10px] text-gray-500 font-bold font-cairo">
+                          صفحة {safeLedgerInvoicesPage} من {totalLedgerInvoicesPages}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={safeLedgerInvoicesPage === 1}
+                            className="p-1 rounded bg-white/5 text-gray-400 disabled:opacity-30 hover:bg-white/10 transition-colors cursor-pointer"
+                          >
+                            <ArrowLeft size={12} className="rotate-180" />
+                          </button>
+                          <button
+                            onClick={() => setCurrentPage(p => Math.min(totalLedgerInvoicesPages, p + 1))}
+                            disabled={safeLedgerInvoicesPage === totalLedgerInvoicesPages}
+                            className="p-1 rounded bg-white/5 text-gray-400 disabled:opacity-30 hover:bg-white/10 transition-colors cursor-pointer"
+                          >
+                            <ArrowLeft size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="bg-[#121212] border-y border-white/5 divide-y divide-white/5">
+                      {currentLedgerTransactions.map(tx => (
+                        <div key={tx.id} className="px-3 py-3.5 text-xs flex items-center justify-between hover:bg-white/5 transition-colors">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-white font-mono text-xs">سند رقم: {tx.voucherNumber}</span>
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${tx.type === 'receipt' ? 'bg-green-600/15 text-green-400' : 'bg-amber-600/15 text-amber-500'}`}>
+                                {tx.type === 'receipt' ? 'سند قبض مالي' : 'سند صرف للعميل'}
+                              </span>
+                              <span className="text-[10px] text-purple-400 font-cairo">({tx.transactionCategory})</span>
+                            </div>
+                            <p className="text-[10px] text-gray-400 font-cairo leading-relaxed">{tx.notes || 'سند مالي مستحق على الدفاتر.'}</p>
+                            <span className="text-[9px] text-gray-600 font-mono">
+                              {formatTxDate(tx)}
+                            </span>
+                          </div>
+                          
+                          <div className="text-left font-mono">
+                            <span className={`text-xs sm:text-sm font-black ${tx.type === 'receipt' ? 'text-green-500' : 'text-amber-500'}`}>
+                              {tx.type === 'receipt' ? '+' : '-'}{Math.abs(tx.amount).toLocaleString('en-US')} {tx.currency}
+                            </span>
+                            <p className="text-[9px] text-gray-500 font-cairo mt-0.5">{getFundDisplayName(tx)}</p>
+                          </div>
+                        </div>
+                      ))}
+                      {ledgerCustomerTransactions.length === 0 && (
+                        <div className="text-center py-8 text-gray-500 font-cairo text-xs font-bold px-3">لا يوجد سندات قبض أو صرف مسجلة لهذا العميل.</div>
+                      )}
+                    </div>
+
+                    {/* Pagination for Transactions */}
+                    {totalLedgerTransactionsPages > 1 && (
+                      <div className="flex items-center justify-between mx-2 px-4 py-2 border border-white/5 bg-black/10 rounded-xl">
+                        <span className="text-[10px] text-gray-500 font-bold font-cairo">
+                          صفحة {safeLedgerTransactionsPage} من {totalLedgerTransactionsPages}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={safeLedgerTransactionsPage === 1}
+                            className="p-1 rounded bg-white/5 text-gray-400 disabled:opacity-30 hover:bg-white/10 transition-colors cursor-pointer"
+                          >
+                            <ArrowLeft size={12} className="rotate-180" />
+                          </button>
+                          <button
+                            onClick={() => setCurrentPage(p => Math.min(totalLedgerTransactionsPages, p + 1))}
+                            disabled={safeLedgerTransactionsPage === totalLedgerTransactionsPages}
+                            className="p-1 rounded bg-white/5 text-gray-400 disabled:opacity-30 hover:bg-white/10 transition-colors cursor-pointer"
+                          >
+                            <ArrowLeft size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons Footer */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/5 pt-4 pb-2 mt-auto px-4 md:px-8">
+                <p className="text-[10px] sm:text-xs text-gray-400 font-cairo font-bold leading-relaxed text-right flex-1 w-full">
+                  استخرج ملف PDF تفصيلي بكشف الحساب للطباعة أو الإرسال.
+                </p>
+                <div className="w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const entries = getStatementEntries(ledgerCustomerId, ledgerCurrency);
+                      
+                      const formattedEntries = entries.map((entry) => {
+                        const year = entry.date.getFullYear();
+                        const month = String(entry.date.getMonth() + 1).padStart(2, '0');
+                        const day = String(entry.date.getDate()).padStart(2, '0');
+                        const hours = String(entry.date.getHours()).padStart(2, '0');
+                        const minutes = String(entry.date.getMinutes()).padStart(2, '0');
+                        const formattedDate = `${year}/${month}/${day} ${hours}:${minutes}`;
+
+                        return {
+                          ...entry,
+                          formattedDate
+                        };
+                      });
+                      
+                      setPreviewData({
+                        type: 'statement',
+                        data: {
+                          statement: {
+                            customerName: selectedLedgerCustomer.name,
+                            companyName: selectedLedgerCustomer.companyName || '',
+                            customerPhone: selectedLedgerCustomer.phone1 || '',
+                            customerNumber: selectedLedgerCustomer.customerNumber || selectedLedgerCustomer.id?.substring(0, 5) || '',
+                            currency: ledgerCurrency,
+                            liabilityCurrency: selectedLedgerCustomer.liabilityCurrency || 'USD',
+                            entries: formattedEntries
+                          }
+                        }
+                      });
+                    }}
+                    className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs sm:text-sm font-bold font-cairo shadow-lg shadow-purple-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 hover:shadow-purple-500/40"
+                  >
+                    <Printer size={16} />
+                    <span>إصدار كشف الحساب التفصيلي</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+
+
+      {previewData && (
+        <PrintPreviewOverlay
+          type={previewData.type}
+          data={previewData.data}
+          onClose={() => setPreviewData(null)}
+          shopConfig={shopConfig}
+          user={user}
+        />
+      )}
+
+      {reversalTxToConfirm && (
+        <div className="fixed inset-0 z-[150] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" dir="rtl">
+          <div className="bg-[#121212] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl">
+            <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+              <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-xl">
+                <ArrowRightLeft size={22} className="rotate-90" />
+              </div>
+              <div className="text-right">
+                <h3 className="text-sm font-black text-white font-cairo">تأكيد عملية عكس القيد</h3>
+                <p className="text-[10px] text-gray-400 font-cairo mt-0.5">يرجى تأكيد رغبتكم في عكس هذا القيد المالي</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 bg-white/5 p-4 rounded-xl text-right">
+              <div className="flex justify-between items-center text-xs font-cairo">
+                <span className="text-gray-400">رقم السند:</span>
+                <span className="font-mono font-bold text-amber-500">#{reversalTxToConfirm.voucherNumber}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs font-cairo">
+                <span className="text-gray-400">اسم العميل / الجهة:</span>
+                <span className="font-bold text-white">{reversalTxToConfirm.customerName}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs font-cairo">
+                <span className="text-gray-400">نوع العملية:</span>
+                <span className="font-bold text-gray-200">{reversalTxToConfirm.transactionCategory || (reversalTxToConfirm.type === 'receipt' ? 'قبض' : 'صرف')}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs font-cairo">
+                <span className="text-gray-400">المبلغ:</span>
+                <span className="font-mono font-black text-rose-500">{Math.abs(reversalTxToConfirm.amount).toLocaleString('en-US')} {reversalTxToConfirm.currency}</span>
+              </div>
+              <div className="flex justify-between items-start text-xs font-cairo border-t border-white/5 pt-2 mt-2" dir="rtl">
+                <span className="text-gray-400 shrink-0 ml-4">البيان / الملاحظات:</span>
+                <span className="text-slate-300 font-medium break-all">{reversalTxToConfirm.notes || 'لا يوجد'}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isPosting}
+                onClick={async () => {
+                  await handleReverseEntry(reversalTxToConfirm);
+                  setReversalTxToConfirm(null);
+                }}
+                className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold font-cairo transition-all cursor-pointer shadow-lg shadow-rose-600/20 active:scale-95 flex items-center justify-center gap-2"
+              >
+                {isPosting ? <Loader2 size={16} className="animate-spin" /> : null}
+                <span>تأكيد وعكس القيد</span>
+              </button>
+              <button
+                type="button"
+                disabled={isPosting}
+                onClick={() => setReversalTxToConfirm(null)}
+                className="flex-1 py-3 bg-[#1e1e1e] hover:bg-[#252525] border border-white/5 disabled:opacity-50 text-gray-300 rounded-xl text-xs font-bold font-cairo transition-all cursor-pointer text-center"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

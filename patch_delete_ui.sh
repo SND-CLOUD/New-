@@ -1,0 +1,1 @@
+sed -i 's#<button\n                        type="button"\n                        onClick={() => {\n                          setIsEditingMode(true);#<button\n                        type="button"\n                        onClick={() => {\n                          setIsEditingMode(true);#g' src/components/Customers.tsx

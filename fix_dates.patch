@@ -1,0 +1,10 @@
+--- src/lib/dateUtils.ts
++++ src/lib/dateUtils.ts
+@@ -107,13 +107,13 @@
+ 
+ export const formatTxDate = (tx: any, fallbackText: string = '---'): string => {
+   const d = parseTxDate(tx);
+-  return d ? formatDateTime(d) : fallbackText;
++  // Show raw date for debugging if it fails to parse
++  return d ? formatDateTime(d) : (tx?.timestamp ? String(tx.timestamp) : (tx?.createdAt ? String(tx.createdAt) : fallbackText));
+ };

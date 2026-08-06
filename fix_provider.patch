@@ -1,0 +1,15 @@
+--- src/data/ProviderFactory.ts
++++ src/data/ProviderFactory.ts
+@@ -62,11 +62,8 @@
+   static getActiveProviderType(): 'LOCAL' | 'CLOUD' {
+     this.init();
+     const mode = this.getMode();
+-    if (mode === 'LOCAL') return 'LOCAL';
+-    if (mode === 'CLOUD') return 'CLOUD';
+-    
+-    // AUTO mode: Always use LOCAL first for robust offline capabilities.
+-    // The background SyncEngine will replicate changes from the SQLite outbox.
++    // Force LOCAL provider for all modes because the UI heavily relies on localDb.query (SQLite).
++    // SyncEngine will replicate changes to Firebase in the background.
+     return 'LOCAL';
+   }

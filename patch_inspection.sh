@@ -1,0 +1,2 @@
+sed -i 's/const avItems = items.filter(i => i.invoiceNumber === invoice.invoiceNumber && i.status === targetStatus);/const avItems = items.filter(i => i.invoiceNumber === invoice.invoiceNumber \&\& i.status === targetStatus);\n    setInvoiceItems(avItems);\n    const existingTech = avItems.find(i => i.technician)?.technician || "";\n    setEngineerName(existingTech || user?.name || "");/g' src/components/movement/Inspection.tsx
+sed -i 's/setInvoiceItems(avItems);//g' src/components/movement/Inspection.tsx

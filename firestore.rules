@@ -1,0 +1,119 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Validation Helpers ---
+    function incoming() { return request.resource.data; }
+    
+    function isValidCustomer(data) {
+      return (!data.keys().hasAll(['name']) || data.name is string) &&
+             (!data.keys().hasAll(['phone1']) || data.phone1 is string);
+    }
+
+    function isValidInvoice(data) {
+      return (!data.keys().hasAll(['invoiceNumber']) || (data.invoiceNumber is string || data.invoiceNumber is number)) &&
+             (!data.keys().hasAll(['customerId']) || data.customerId is string) &&
+             (!data.keys().hasAll(['totalCost']) || data.totalCost is number) &&
+             (!data.keys().hasAll(['amountPaid']) || data.amountPaid is number) &&
+             (!data.keys().hasAll(['status']) || (data.status is string && data.status.size() <= 32));
+    }
+
+    function isValidInvoiceItem(data) {
+      return (!data.keys().hasAll(['invoiceId']) || data.invoiceId is string) &&
+             (!data.keys().hasAll(['deviceType']) || data.deviceType is string) &&
+             (!data.keys().hasAll(['quantity']) || data.quantity is number) &&
+             (!data.keys().hasAll(['cost']) || data.cost is number) &&
+             (!data.keys().hasAll(['status']) || (data.status is string && data.status.size() <= 32));
+    }
+
+    function isValidVaultTransaction(data) {
+      return (!data.keys().hasAll(['currency']) || data.currency is string) &&
+             (!data.keys().hasAll(['amount']) || data.amount is number) &&
+             (!data.keys().hasAll(['invoiceNumber']) || (data.invoiceNumber is string || data.invoiceNumber is number)) &&
+             (!data.keys().hasAll(['userName']) || data.userName is string) &&
+             (!data.keys().hasAll(['userId']) || data.userId is string);
+    }
+
+    function isValidInventory(data) {
+      return (!data.keys().hasAll(['name']) || data.name is string) &&
+             (!data.keys().hasAll(['quantity']) || data.quantity is number) &&
+             (!data.keys().hasAll(['price']) || data.price is number);
+    }
+
+    // --- Matches ---
+    match /customers/{customerId} {
+      allow read, write: if true;
+    }
+    match /invoices/{invoiceId} {
+      allow read, write: if true;
+    }
+    match /invoice_items/{itemId} {
+      allow read, write: if true;
+    }
+    match /inventory_items/{itemId} {
+      allow read, write: if true;
+    }
+    match /vault_transactions/{txId} {
+      allow read, write: if true;
+    }
+    match /currencies/{id} {
+      allow read, write: if true;
+    }
+    match /fin_transaction_types/{id} {
+      allow read, write: if true;
+    }
+    match /fin_funds/{id} {
+      allow read, write: if true;
+    }
+    match /fin_currencies/{id} {
+      allow read, write: if true;
+    }
+    match /fin_payment_methods/{id} {
+      allow read, write: if true;
+    }
+    match /device_types/{id} {
+      allow read, write: if true;
+    }
+    match /device_categories/{id} {
+      allow read, write: if true;
+    }
+    match /device_models/{id} {
+      allow read, write: if true;
+    }
+    match /document_outputs/{id} {
+      allow read, write: if true;
+    }
+    match /settings/{docId} {
+      allow read, write: if true;
+    }
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    match /engineers/{engineerId} {
+      allow read, write: if true;
+    }
+    match /maintenance_actions/{actionId} {
+      allow read, write: if true;
+    }
+    match /company_details/{docId} {
+      allow read, write: if true;
+    }
+    match /user_devices/{deviceId} {
+      allow read, write: if true;
+    }
+    match /approval_actions/{docId} {
+      allow read, write: if true;
+    }
+    match /job_titles/{id} {
+      allow read, write: if true;
+    }
+    match /test/{docId} {
+      allow get: if true;
+    }
+  }
+}

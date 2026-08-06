@@ -1,0 +1,442 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;700;900&family=Inter:wght@400;500;700;900&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-orange-500: #ff6b00;
+  --color-orange-600: #e66000;
+  --font-space: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --font-outfit: "Outfit", sans-serif;
+  --font-playfair: "Playfair Display", serif;
+  --font-cairo: "Cairo", sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-[#0f0f0f] text-gray-100 antialiased;
+  }
+
+  /* Force Western numerals */
+  input[type="number"], 
+  input[inputmode="numeric"],
+  input[inputmode="decimal"],
+  .font-mono {
+    unicode-bidi: plaintext;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-white/10 rounded-full hover:bg-white/20 transition-colors;
+  }
+
+  /* Remove arrows from number inputs */
+  input::-webkit-outer-spin-button,
+  input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type=number] {
+    -moz-appearance: textfield;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* High-Fidelity Light Mode Overrides */
+html.light-app,
+html.light-app body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Root scrollbar tweak */
+html.light-app ::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1 !important;
+}
+html.light-app ::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8 !important;
+}
+
+/* Base background classes mapped to elegant clean white */
+html.light-app .bg-\[\#0a0a0a\],
+html.light-app .bg-\[\#0f0f0f\],
+html.light-app .bg-\[\#141414\],
+html.light-app .bg-\[\#181818\],
+html.light-app .bg-\[\#101010\],
+html.light-app .bg-\[\#161616\],
+html.light-app .bg-\[\#1c1c1c\],
+html.light-app .bg-\[\#1e1e1e\],
+html.light-app .bg-\[\#242424\],
+html.light-app .bg-\[\#111111\],
+html.light-app .bg-\[\#151515\],
+html.light-app .bg-\[\#121212\],
+html.light-app .bg-\[\#1a1a1a\],
+html.light-app .bg-\[\#131313\],
+html.light-app .bg-\[\#18181b\],
+html.light-app .bg-\[\#09090b\],
+html.light-app .bg-black\/20,
+html.light-app .bg-black\/30,
+html.light-app .bg-black\/40,
+html.light-app .bg-black\/50,
+html.light-app .bg-black\/60,
+html.light-app .bg-black\/70,
+html.light-app .bg-black\/80,
+html.light-app .bg-white\/5,
+html.light-app .bg-white\/10,
+html.light-app .bg-neutral-900,
+html.light-app .bg-neutral-950,
+html.light-app .bg-zinc-900,
+html.light-app .bg-zinc-950,
+html.light-app .bg-gray-950,
+html.light-app .bg-gray-900,
+html.light-app .bg-slate-900 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Modals, Floating Dialogs, popups and dropdowns */
+html.light-app .fixed .bg-\[\#141414\],
+html.light-app .fixed .bg-\[\#0f0f0f\],
+html.light-app .fixed .bg-\[\#181818\],
+html.light-app .fixed .bg-neutral-900,
+html.light-app .fixed .bg-zinc-900,
+html.light-app .absolute.z-50,
+html.light-app .absolute.z-\[999\] {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.15) !important;
+}
+
+/* Hover and active options inside list views / dropdowns */
+html.light-app .hover\:bg-white\/5:hover,
+html.light-app .hover\:bg-white\/10:hover,
+html.light-app .hover\:bg-black\/20:hover,
+html.light-app .hover\:bg-neutral-800:hover,
+html.light-app .hover\:bg-zinc-800:hover,
+html.light-app .group:hover .group-hover\:bg-white\/5,
+html.light-app .group:hover .group-hover\:bg-white\/10,
+html.light-app .group:hover .group-hover\:bg-neutral-800,
+html.light-app .group:hover .group-hover\:bg-zinc-800 {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Sidebar structure customization */
+html.light-app aside {
+  background-color: #f8fafc !important;
+  border-right: 1px solid #e2e8f0 !important;
+}
+
+html.light-app header {
+  background-color: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05) !important;
+}
+
+/* Text Swaps for Clean Contrast */
+html.light-app .text-white,
+html.light-app .text-gray-100,
+html.light-app .text-neutral-100,
+html.light-app .text-zinc-100,
+html.light-app h1,
+html.light-app h2,
+html.light-app h3,
+html.light-app h4,
+html.light-app h5,
+html.light-app h6,
+html.light-app th {
+  color: #0f172a !important;
+}
+
+html.light-app .text-gray-200,
+html.light-app .text-neutral-200,
+html.light-app .text-zinc-200 {
+  color: #1e293b !important;
+}
+
+html.light-app .text-gray-300,
+html.light-app .text-neutral-300,
+html.light-app .text-zinc-300,
+html.light-app p,
+html.light-app td {
+  color: #334155 !important;
+}
+
+html.light-app .text-gray-400,
+html.light-app .text-neutral-400,
+html.light-app .text-zinc-400,
+html.light-app label,
+html.light-app svg {
+  color: #475569 !important;
+}
+
+html.light-app .text-gray-500,
+html.light-app .text-neutral-500,
+html.light-app .text-zinc-500 {
+  color: #64748b !important;
+}
+
+html.light-app .text-white\/40,
+html.light-app .text-white\/50,
+html.light-app .text-white\/60,
+html.light-app .text-white\/70,
+html.light-app .text-white\/80,
+html.light-app .text-white\/90 {
+  color: #475569 !important;
+}
+
+/* Restore orange branding highlight text color and green success triggers */
+html.light-app .text-orange-500,
+html.light-app .text-orange-600,
+html.light-app .text-amber-500,
+html.light-app .text-amber-600 {
+  color: #ea580c !important;
+}
+html.light-app .text-emerald-500,
+html.light-app .text-emerald-400,
+html.light-app .text-green-500,
+html.light-app .text-green-400 {
+  color: #16a34a !important;
+}
+
+/* Custom layout borders */
+html.light-app .border-white\/5,
+html.light-app .border-white\/10,
+html.light-app .border-white\/20,
+html.light-app .border-neutral-800,
+html.light-app .border-zinc-800,
+html.light-app .border-gray-800,
+html.light-app .border-zinc-700,
+html.light-app .border-gray-700 {
+  border-color: #cbd5e1 !important;
+}
+
+/* Global inputs, checkboxes & select elements */
+html.light-app input,
+html.light-app select,
+html.light-app textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+html.light-app select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html.light-app input::placeholder,
+html.light-app textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.light-app input:focus,
+html.light-app select:focus,
+html.light-app textarea:focus {
+  border-color: #ea580c !important;
+  box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.2) !important;
+  outline: none !important;
+}
+
+/* Alternate light backgrounds on grids and tables */
+html.light-app table,
+html.light-app .table {
+  background-color: #ffffff !important;
+}
+
+html.light-app table th {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-bottom: 2px solid #e2e8f0 !important;
+}
+
+html.light-app table td {
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+html.light-app tbody tr:nth-child(even) {
+  background-color: #f8fafc !important;
+}
+
+/* Status pills mapping from dark trans to solid clean light contrast badges */
+html.light-app .bg-emerald-500\/10,
+html.light-app .bg-emerald-600\/10,
+html.light-app .bg-green-500\/10 {
+  background-color: #dcfce7 !important;
+  color: #16a34a !important;
+}
+
+html.light-app .bg-red-500\/10,
+html.light-app .bg-red-600\/10,
+html.light-app .bg-rose-500\/10 {
+  background-color: #fee2e2 !important;
+  color: #dc2626 !important;
+}
+
+html.light-app .bg-amber-500\/10,
+html.light-app .bg-amber-600\/10,
+html.light-app .bg-yellow-500\/10 {
+  background-color: #fef3c7 !important;
+  color: #d97706 !important;
+}
+
+html.light-app .bg-blue-500\/10,
+html.light-app .bg-blue-600\/10 {
+  background-color: #dbeafe !important;
+  color: #2563eb !important;
+}
+
+html.light-app .bg-purple-500\/10,
+html.light-app .bg-purple-600\/10 {
+  background-color: #f3e8ff !important;
+  color: #9333ea !important;
+}
+
+/* Sidebar and Navigation Overrides */
+html.light-app nav button.text-gray-400,
+html.light-app nav a.text-gray-400 {
+  color: #475569 !important;
+}
+
+html.light-app nav button.text-gray-400:hover,
+html.light-app nav a.text-gray-400:hover {
+  background-color: rgba(234, 88, 12, 0.08) !important;
+  color: #ea580c !important;
+}
+
+/* Recharts Tooltip Overrides */
+html.light-app .recharts-default-tooltip {
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
+}
+
+html.light-app .recharts-tooltip-item {
+  color: #0f172a !important;
+}
+
+/* Customers Section Theme Styles (Light + Dark compatibility) */
+.customers-box {
+  background-color: #1a1a1a;
+}
+html.light-app .customers-box {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+.customers-dropdown {
+  background-color: #1f1f1f;
+}
+html.light-app .customers-dropdown {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.customers-details-card {
+  background-color: #121212;
+}
+html.light-app .customers-details-card {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+.customer-static-input {
+  background-color: #161616;
+}
+html.light-app .customer-static-input {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+.customer-modal-bg {
+  background-color: #141414;
+}
+html.light-app .customer-modal-bg {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Mobile Bottom Navigation Theme Overrides */
+html.light-app .mobile-bottom-nav {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+  border-top-color: #cbd5e1 !important;
+  box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.05), 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
+
+html.light-app .mobile-center-btn {
+  box-shadow: 0 0 0 4px #ffffff, 0 10px 15px -3px rgba(249, 115, 22, 0.3) !important;
+}
+
+/* Printable Documents Table Cell & Counter Alignment Fixes */
+#print-preview-area th,
+#print-preview-area td,
+#print-report-area th,
+#print-report-area td,
+#print-area th,
+#print-area td {
+  vertical-align: middle !important;
+  line-height: 1.2 !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+}
+
+/* Ensure explicit text alignments are preserved inside tables */
+#print-preview-area th.text-right,
+#print-preview-area td.text-right,
+#print-report-area th.text-right,
+#print-report-area td.text-right,
+#print-area th.text-right,
+#print-area td.text-right {
+  text-align: right !important;
+}
+
+#print-preview-area th.text-center,
+#print-preview-area td.text-center,
+#print-report-area th.text-center,
+#print-report-area td.text-center,
+#print-area th.text-center,
+#print-area td.text-center {
+  text-align: center !important;
+}
+
+#print-preview-area th.text-left,
+#print-preview-area td.text-left,
+#print-report-area th.text-left,
+#print-report-area td.text-left,
+#print-area th.text-left,
+#print-area td.text-left {
+  text-align: left !important;
+}
+
+/* Specific centering tweak for numbers inside counter boxes to align perfectly */
+.w-12.h-8 {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  padding: 0 !important;
+}
+

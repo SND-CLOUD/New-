@@ -1,0 +1,462 @@
+                {activeAccountingInputsModal === 'backup' && (
+                  <div className="space-y-3 pb-4">
+                    {backupSubTab === 'list' ? (
+                      <div className="space-y-2">
+                        {/* Stats Block */}
+                        <motion.button
+                          whileHover={{ scale: 1.005 }}
+                          whileTap={{ scale: 0.995 }}
+                          onClick={() => setBackupSubTab('stats')}
+                          className="w-full bg-white/5 text-white p-3.5 rounded-[1.2rem] border border-white/10 flex items-center gap-3 shadow-xl relative group overflow-hidden"
+                        >
+                          <div className="flex-1 rtl:text-right">
+                             <h3 className="text-base font-bold font-cairo">إحصائيات وقاعدة البيانات</h3>
+                             <div className="mt-1 space-y-0.5">
+                                <div className="flex items-center justify-end gap-2 text-[9px] text-gray-400 font-bold uppercase tracking-widest">
+                                   <span>{statsData.invoices + statsData.customers + statsData.maintenance}</span>
+                                   <span>:إجمالي السجلات</span>
+                                   <RefreshCw size={8} className="text-gray-500" />
+                                </div>
+                                <div className="flex items-center justify-end gap-2 text-[9px] text-gray-400 font-bold uppercase tracking-widest">
+                                   <span>{((statsData.invoices + statsData.customers + statsData.maintenance) * 0.012).toFixed(3)} MB</span>
+                                   <span>:الحجم الكلي</span>
+                                   <RefreshCw size={8} className="text-gray-500" />
+                                </div>
+                             </div>
+                          </div>
+                          <div className="p-2.5 bg-blue-600/10 text-blue-500 rounded-xl">
+                             <Database size={22} />
+                          </div>
+                        </motion.button>
+
+                        {/* Audit & Repair Block */}
+                        <motion.button
+                          whileHover={{ scale: 1.005 }}
+                          whileTap={{ scale: 0.995 }}
+                          onClick={() => {
+                            setBackupSubTab('audit');
+                            runDatabaseAudit();
+                          }}
+                          className="w-full bg-orange-600/10 text-orange-500 p-3.5 rounded-[1.2rem] border border-orange-500/20 flex items-center gap-3 shadow-xl relative group overflow-hidden"
+                        >
+                          <div className="flex-1 rtl:text-right">
+                             <h3 className="text-base font-bold font-cairo text-orange-450">مربع تدقيق ومطابقة البيانات (Audit)</h3>
+                             <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mt-0.5">فحص ومعالجة التضاربات بين عدادات البرنامج وسجلات قاعدة البيانات</p>
+                          </div>
+                          <div className="p-2.5 bg-orange-600/15 text-orange-500 rounded-xl group-hover:scale-105 transition-transform">
+                             <Shield size={22} />
+                          </div>
+                        </motion.button>
+
+                        {/* Backup Block */}
+                        <motion.button
+                          whileHover={{ scale: 1.005 }}
+                          whileTap={{ scale: 0.995 }}
+                          onClick={() => setBackupSubTab('backup_manual')}
+                          className="w-full bg-white/5 text-white p-3.5 rounded-[1.2rem] border border-white/10 flex items-center gap-3 shadow-xl relative group overflow-hidden"
+                        >
+                          <div className="flex-1 rtl:text-right">
+                             <h3 className="text-base font-bold font-cairo">النسخ الاحتياطي</h3>
+                             <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">نسخ محلي وتلقائي للبيانات</p>
+                          </div>
+                          <div className="p-2.5 bg-purple-600/10 text-purple-500 rounded-xl">
+                             <Database size={22} />
+                          </div>
+                        </motion.button>
+
+                        {/* Export Block */}
+                        <motion.button
+                          whileHover={{ scale: 1.005 }}
+                          whileTap={{ scale: 0.995 }}
+                          onClick={() => setBackupSubTab('export')}
+                          className="w-full bg-white/5 text-white p-3.5 rounded-[1.2rem] border border-white/10 flex items-center gap-3 shadow-xl relative group overflow-hidden"
+                        >
+                          <div className="flex-1 rtl:text-right">
+                             <h3 className="text-base font-bold font-cairo">تصدير بلاس</h3>
+                             <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">تصدير شامل ومنظم للسجلات</p>
+                          </div>
+                          <div className="p-2.5 bg-emerald-600/10 text-emerald-500 rounded-xl">
+                             <Download size={22} />
+                          </div>
+                        </motion.button>
+
+                        {/* Import Block */}
+                        <motion.button
+                          whileHover={{ scale: 1.005 }}
+                          whileTap={{ scale: 0.995 }}
+                          onClick={() => setBackupSubTab('import')}
+                          className="w-full bg-white/5 text-white p-3.5 rounded-[1.2rem] border border-white/10 flex items-center gap-3 shadow-xl relative group overflow-hidden"
+                        >
+                          <div className="flex-1 rtl:text-right">
+                             <h3 className="text-base font-bold font-cairo">الاستيراد والاستعادة</h3>
+                             <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">استعادة أو دمج بيانات سابقة</p>
+                          </div>
+                          <div className="p-2.5 bg-orange-600/10 text-orange-500 rounded-xl">
+                             <Upload size={22} />
+                          </div>
+                        </motion.button>
+
+                        {/* Archive Block */}
+                        <motion.button
+                          whileHover={{ scale: 1.005 }}
+                          whileTap={{ scale: 0.995 }}
+                          onClick={() => setBackupSubTab('archive')}
+                          className="w-full bg-white/5 text-white p-3.5 rounded-[1.2rem] border border-white/10 flex items-center gap-3 shadow-xl relative group overflow-hidden"
+                        >
+                          <div className="flex-1 rtl:text-right">
+                             <h3 className="text-base font-bold font-cairo">أرشفة الملفات</h3>
+                             <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">مسح وتفريغ السجلات المنتهية</p>
+                          </div>
+                          <div className="p-2.5 bg-gray-600/10 text-gray-500 rounded-xl">
+                             <Archive size={22} />
+                          </div>
+                        </motion.button>
+
+
+                        {/* Reset Block */}
+                        <motion.button
+                          whileHover={{ scale: 1.005 }}
+                          whileTap={{ scale: 0.995 }}
+                          type="button"
+                          onClick={() => {
+                            console.log('Manual click on Reset Button');
+                            resetAllDataTemp();
+                          }}
+                          className="w-full bg-red-500/10 text-red-500 p-5 rounded-[1.2rem] border border-red-500/20 flex items-center gap-3 shadow-xl mt-4 cursor-pointer active:bg-red-500/20"
+                        >
+                          <div className="flex-1 text-right rtl:text-right">
+                             <h3 className="text-base font-bold font-cairo">تهيئة النظام (ضبط المصنع)</h3>
+                             <p className="text-[9px] text-red-400 font-bold uppercase tracking-widest mt-0.5 select-none">Factory Wipe & Data Reset</p>
+                          </div>
+                          <div className="p-3 bg-red-500 text-white rounded-xl shadow-lg">
+                             <RotateCcw size={24} />
+                          </div>
+                        </motion.button>
+                        <div className="h-10" /> {/* Extra space at the bottom */}
+                      </div>
+                    ) : (
+                      <motion.div 
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="space-y-4"
+                      >
+                          <button 
+                            onClick={() => setBackupSubTab('list')}
+                            className="p-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl transition-all border border-white/5 mb-4"
+                            title="العودة للقائمة"
+                          >
+                             <ArrowRight size={18} />
+                          </button>
+
+                         {backupSubTab === 'backup_manual' && (
+                            <section className="bg-white/5 rounded-[1.5rem] border border-white/10 overflow-hidden shadow-2xl">
+                               <div className="p-5 md:p-8 border-b border-white/5 bg-gradient-to-br from-emerald-600/10 to-transparent flex items-center justify-between rtl:flex-row-reverse">
+                                  <div className="flex items-center gap-4 rtl:flex-row-reverse">
+                                    <div className="p-3 bg-emerald-600 text-white rounded-xl shadow-lg ring-2 ring-emerald-600/20">
+                                      <Database size={24} />
+                                    </div>
+                                    <div className="rtl:text-right">
+                                      <h2 className="font-mono text-xl font-black text-white uppercase tracking-tighter">النسخ الاحتياطي</h2>
+                                      <p className="text-[9px] text-emerald-500 font-bold uppercase tracking-widest mt-0.5">Control Panel</p>
+                                    </div>
+                                  </div>
+                               </div>
+                               <div className="p-5 md:p-8 space-y-6">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                     <div className="p-5 bg-black/40 rounded-[1.5rem] border border-white/5 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                           <div className="flex items-center gap-3">
+                                              <div className="p-3 bg-emerald-600/10 text-emerald-500 rounded-xl"><Clock size={24} /></div>
+                                              <span className="font-bold text-sm text-white">النسخ التلقائي</span>
+                                           </div>
+                                           <label className="relative inline-flex items-center cursor-pointer scale-110">
+                                              <input type="checkbox" checked={autoBackup} onChange={e => setAutoBackup(e.target.checked)} className="sr-only peer" />
+                                              <div className="w-12 h-6 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600 shadow-inner"></div>
+                                           </label>
+                                        </div>
+                                        {autoBackup && (
+                                           <div className="space-y-2 pt-2 border-t border-white/5">
+                                              <label className="text-[9px] text-gray-400 uppercase font-black tracking-widest block rtl:text-right">وقت النسخ</label>
+                                              <input type="time" value={backupTime} onChange={e => setBackupTime(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white text-2xl font-mono text-center focus:border-emerald-500 outline-none" />
+                                           </div>
+                                        )}
+                                     </div>
+                                     <div className="p-5 bg-black/40 rounded-[1.5rem] border border-white/5 space-y-4">
+                                        <div className="flex items-center gap-3">
+                                           <div className="p-3 bg-emerald-600/10 text-emerald-500 rounded-xl"><HardDrive size={24} /></div>
+                                           <span className="font-bold text-sm text-white">مسار التخزين</span>
+                                        </div>
+                                        <input type="text" readOnly value={backupPath} className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-[10px] font-mono text-gray-400 truncate" />
+                                     </div>
+                                  </div>
+                                  <div className="flex gap-4">
+                                     <button onClick={handleSaveSettings} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-[1.5rem] font-bold text-base shadow-2xl transition-all active:scale-95">حفظ الإعدادات</button>
+                                     <button 
+                                       disabled={backupLoading}
+                                       onClick={handleExportBackup} 
+                                       className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-[1.5rem] font-bold text-base shadow-2xl transition-all active:scale-95 disabled:opacity-50"
+                                     >
+                                       {backupLoading ? 'جاري النسخ...' : 'نسخ احتياطي الآن'}
+                                     </button>
+                                  </div>
+                               </div>
+                            </section>
+                         )}
+
+                         {backupSubTab === 'export' && (
+                            <section className="bg-white/5 rounded-[1.5rem] border border-white/10 p-5 text-center space-y-4">
+                               <div className="p-4 bg-emerald-600/10 text-emerald-500 rounded-full w-16 h-16 mx-auto flex items-center justify-center">
+                                  <Download size={28} />
+                               </div>
+                               <div>
+                                  <h3 className="text-xl font-black text-white font-cairo">تصدير بلاس</h3>
+                                  <p className="text-gray-500 mt-1 text-[10px]">تجهيز ملف شامل لجميع بيانات النظام بتنسيق JSON</p>
+                               </div>
+                               <button 
+                                 disabled={backupLoading}
+                                 onClick={handleExportBackup} 
+                                 className="bg-white text-black px-6 py-2.5 rounded-lg font-black text-xs hover:scale-105 active:scale-95 transition-transform flex items-center gap-2 mx-auto disabled:opacity-50"
+                               >
+                                  <Download size={16} />
+                                  <span>{backupLoading ? 'جاري التصدير...' : 'بدء التصـدير'}</span>
+                               </button>
+                            </section>
+                         )}
+
+                         {backupSubTab === 'import' && (
+                            <section className="bg-white/5 rounded-[1.5rem] border border-white/10 p-5 text-center space-y-4">
+                               <div className="p-4 bg-orange-600/10 text-orange-500 rounded-full w-16 h-16 mx-auto flex items-center justify-center">
+                                  <Upload size={28} />
+                               </div>
+                               <div>
+                                  <h3 className="text-xl font-black text-white font-cairo">الاستيراد والاستعادة</h3>
+                                  <p className="text-gray-500 mt-1 text-[10px]">اختر ملف النسخة الاحتياطية لاستعادة السجلات</p>
+                               </div>
+                               <label className={`max-w-xs mx-auto border border-dashed border-white/20 p-4 rounded-xl hover:border-orange-500/50 transition-colors cursor-pointer group block ${backupLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+                                  <FileText className="mx-auto text-gray-600 group-hover:text-orange-500 transition-colors" size={32} />
+                                  <p className="mt-2 text-[9px] text-gray-500">{backupLoading ? 'جاري الاستعادة...' : 'اختر الملف من الذاكرة'}</p>
+                                  <input 
+                                    type="file" 
+                                    accept=".json"
+                                    className="hidden"
+                                    onChange={handleImportBackup}
+                                  />
+                               </label>
+                            </section>
+                         )}
+
+                         {backupSubTab === 'archive' && (
+                            <section className="bg-white/5 rounded-[1.5rem] border border-white/10 p-5 text-center space-y-4">
+                               <div className="p-4 bg-gray-600/10 text-gray-400 rounded-full w-16 h-16 mx-auto flex items-center justify-center">
+                                  <Archive size={28} />
+                               </div>
+                               <div>
+                                  <h3 className="text-xl font-black text-white font-cairo">أرشفة الملفات</h3>
+                                  <p className="text-gray-500 mt-1 text-[10px]">نقل السجلات القديمة المنتهية لقاعدة بيانات الأرشيف</p>
+                               </div>
+                               <div className="flex justify-center max-w-sm mx-auto">
+                                  <button 
+                                    disabled={backupLoading}
+                                    onClick={handleArchive}
+                                    className="bg-white/10 text-white font-black rounded-lg px-8 py-3 hover:bg-white/20 transition-all text-xs disabled:opacity-50"
+                                  >
+                                    {backupLoading ? 'جاري التنفيذ...' : 'مسح السجلات المنتهية (أقدم من 12 شهر)'}
+                                  </button>
+                               </div>
+                            </section>
+                         )}
+
+                         {backupSubTab === 'stats' && (
+                            <section className="bg-white/5 rounded-[1.5rem] border border-white/10 p-4 space-y-4">
+                               <div className="flex items-center gap-3 rtl:flex-row-reverse">
+                                  <div className="p-3 bg-blue-600 text-white rounded-lg shadow-xl"><Database size={20} /></div>
+                                  <div className="rtl:text-right">
+                                     <h3 className="text-lg font-black text-white font-cairo">تفاصيل قاعدة البيانات</h3>
+                                     <p className="text-[8px] text-gray-500">فحص الحالة وتوافر البيانات</p>
+                                  </div>
+                               </div>
+                               <div className="grid grid-cols-2 gap-2">
+                                  {[
+                                     { label: 'الفواتير المسجلة', value: statsData.invoices, icon: FileText, color: 'text-blue-500' },
+                                     { label: 'العملاء المسجلين', value: statsData.customers, icon: Smartphone, color: 'text-purple-500' },
+                                     { label: 'عمليات الصيانة', value: statsData.maintenance, icon: RefreshCw, color: 'text-orange-500' },
+                                     { label: 'رقم الفاتورة القادمة', value: invoiceCounter + 1, icon: Shield, color: 'text-emerald-500' },
+                                  ].map((stat, i) => (
+                                     <div key={i} className="p-3 bg-black/40 rounded-xl border border-white/5 flex flex-col items-center text-center gap-1.5">
+                                        <stat.icon className={stat.color} size={16} />
+                                        <span className="text-sm font-black text-white">{stat.value}</span>
+                                        <span className="text-[7px] text-gray-500 uppercase font-black">{stat.label}</span>
+                                     </div>
+                                  ))}
+                               </div>
+                            </section>
+                         )}
+
+                         {backupSubTab === 'audit' && (
+                            <section className="bg-white/5 rounded-[1.5rem] border border-white/10 p-5 space-y-6 rtl:text-right text-gray-200">
+                              <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                                <div className="flex items-center gap-3 rtl:flex-row-reverse">
+                                  <div className="p-3 bg-orange-600/15 text-orange-500 rounded-xl">
+                                    <Shield size={24} />
+                                  </div>
+                                  <div className="rtl:text-right">
+                                    <h3 className="text-lg font-bold text-white font-cairo">تدقيق ومطابقة السجلات الفعلية (Interactive Database Audit)</h3>
+                                    <p className="text-xs text-gray-400">تحقق ومقارنة العدادات المسجلة في واجهة الإعدادات والعمليات المالية مع سجلات خادم قاعدة البيانات</p>
+                                  </div>
+                                </div>
+                                <button 
+                                  onClick={runDatabaseAudit} 
+                                  disabled={isAuditing}
+                                  className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold flex items-center gap-2 transition-all"
+                                >
+                                  <RefreshCw size={14} className={isAuditing ? "animate-spin" : ""} />
+                                  <span>تحديث الفحص</span>
+                                </button>
+                              </div>
+
+                              {isAuditing ? (
+                                <div className="py-12 flex flex-col items-center justify-center gap-4">
+                                  <RefreshCw size={36} className="animate-spin text-orange-500" />
+                                  <p className="text-sm text-gray-400 font-bold">جاري تشغيل خوارزميات الفحص والمطابقة لجميع عناصر قاعدة البيانات...</p>
+                                </div>
+                              ) : auditResults ? (
+                                <div className="space-y-6">
+                                  {repairProgress.message && (
+                                    <div className={`p-4 rounded-2xl border text-xs font-bold ${
+                                      repairProgress.status === 'running' ? 'bg-orange-600/10 border-orange-500/30 text-orange-400 font-mono' :
+                                      repairProgress.status === 'completed' ? 'bg-emerald-600/10 border-emerald-500/30 text-emerald-400 font-bold' :
+                                      repairProgress.status === 'error' ? 'bg-red-600/10 border-red-500/30 text-red-400 font-bold' : 'bg-white/5 border-white/10 text-white'
+                                    }`}>
+                                      <p>{repairProgress.message}</p>
+                                    </div>
+                                  )}
+
+                                  <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-gradient-to-r from-orange-600/10 to-amber-600/5 rounded-2.5xl border border-orange-500/15 gap-4">
+                                    <div className="text-right flex-1 select-none">
+                                      <p className="text-white font-black text-sm">تسوية وتصحيح التضاربات تلقائياً</p>
+                                      <p className="text-xs text-gray-400 mt-1">تقوم الأداة بمطابقة العدادات، موازنة حركات الصندوق المتصلة بالفواتير الحالية، وتسوية وتصفية مجاميع وعلاقات الفواتير بكبسة زر واحدة.</p>
+                                    </div>
+                                    <button
+                                      onClick={repairAllDiscrepancies}
+                                      className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-2xl font-black text-xs shadow-xl transition-all text-center shrink-0"
+                                    >
+                                      إصلاح وتصحيح التضاربات تلقائياً
+                                    </button>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="p-4 bg-black/40 rounded-2xl border border-white/5 space-y-3">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-bold text-sm text-white">عداد تسلسل الفواتير</span>
+                                        {auditResults.invoiceCounter.conflict ? (
+                                          <span className="px-2.5 py-1 bg-red-500/10 text-red-500 rounded-lg text-[10px] font-black">تضارب مكتشف</span>
+                                        ) : (
+                                          <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-[10px] font-black">سليم</span>
+                                        )}
+                                      </div>
+                                      <div className="text-xs space-y-1 text-gray-400 text-right">
+                                        <p>العداد المسجل بالإعدادات: <strong className="text-white font-mono">{auditResults.invoiceCounter.registered}</strong></p>
+                                        <p>أعلى رقم فاتورة فعلي باللائحة: <strong className="text-white font-mono">{auditResults.invoiceCounter.actualMax}</strong></p>
+                                      </div>
+                                    </div>
+
+                                    <div className="p-4 bg-black/40 rounded-2xl border border-white/5 space-y-3">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-bold text-sm text-white">عداد تسلسل أرقام العملاء</span>
+                                        {auditResults.customerCounter.conflict ? (
+                                          <span className="px-2.5 py-1 bg-red-500/10 text-red-500 rounded-lg text-[10px] font-black">تضارب مكتشف</span>
+                                        ) : (
+                                          <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-[10px] font-black">سليم</span>
+                                        )}
+                                      </div>
+                                      <div className="text-xs space-y-1 text-gray-400 text-right">
+                                        <p>العداد المسجل بالإعدادات: <strong className="text-white font-mono">{auditResults.customerCounter.registered}</strong></p>
+                                        <p>أعلى رقم تسلسلي للعملاء باللائحة: <strong className="text-white font-mono">{auditResults.customerCounter.actualMax}</strong></p>
+                                      </div>
+                                    </div>
+
+                                    <div className="p-4 bg-black/40 rounded-2xl border border-white/5 space-y-3">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-bold text-sm text-white">مطابقة قيمة الفاتورة ومجاميع الأجهزة</span>
+                                        {auditResults.totalDiscrepancies.length > 0 ? (
+                                          <span className="px-2.5 py-1 bg-amber-500/10 text-amber-500 rounded-lg text-[10px] font-black">{auditResults.totalDiscrepancies.length} تباينات</span>
+                                        ) : (
+                                          <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-[10px] font-black">سليم</span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-gray-400">يتحقق من دقة اجمالي سعر الفاتورة الأم مقارنة بمجموع تكلفة أجهزة الصيانة المسجلة بداخلها.</p>
+                                      {auditResults.totalDiscrepancies.length > 0 && (
+                                        <div className="max-h-24 overflow-y-auto space-y-1.5 p-2 bg-black/40 rounded-xl font-mono text-[10px] text-red-300 text-right">
+                                          {auditResults.totalDiscrepancies.map((d: any, idx: number) => (
+                                            <p key={idx}>فاتورة #{d.invoiceNumber}: الفاتورة ({d.currentTotal}) ↔ المجموع الحقيقي ({d.computedTotal})</p>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="p-4 bg-black/40 rounded-2xl border border-white/5 space-y-3">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-bold text-sm text-white">مطابقة الحالات والوضع الفني للعمليات</span>
+                                        {auditResults.statusDiscrepancies.length > 0 ? (
+                                          <span className="px-2.5 py-1 bg-amber-500/10 text-amber-400 rounded-lg text-[10px] font-black">{auditResults.statusDiscrepancies.length} اختلافات</span>
+                                        ) : (
+                                          <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-[10px] font-black">سليم</span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-gray-400">فحص ملخص الفاتورة الخارجي ومطابقته بذكاء بمراحل الصيانة الفنية الفردية الملحقة.</p>
+                                      {auditResults.statusDiscrepancies.length > 0 && (
+                                        <div className="max-h-24 overflow-y-auto space-y-1.5 p-2 bg-black/30 rounded-xl font-mono text-[10px] text-amber-300 text-right">
+                                          {auditResults.statusDiscrepancies.map((d: any, idx: number) => (
+                                            <p key={idx}>فاتورة #{d.invoiceNumber}: مسجل ({d.currentStatus}) ↔ الفعلي ({d.expectedStatus})</p>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="p-4 bg-black/40 rounded-2xl border border-white/5 space-y-3">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-bold text-sm text-white">تطابق الصندوق والمدفوعات</span>
+                                        {auditResults.paymentImbalances.length > 0 ? (
+                                          <span className="px-2.5 py-1 bg-red-500/10 text-red-500 rounded-lg text-[10px] font-black">{auditResults.paymentImbalances.length} عدم تطابق</span>
+                                        ) : (
+                                          <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-[10px] font-black">سليم</span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-gray-400">مقارنة وتدقيق المدفوعات المسجلة بالفاتورة مقابل القيود المقبوضة فعلياً في صندوق الخزينة الحقيقية.</p>
+                                      {auditResults.paymentImbalances.length > 0 && (
+                                        <div className="max-h-28 overflow-y-auto space-y-1.5 p-2 bg-black/30 rounded-xl font-mono text-[10px] text-red-300 text-right">
+                                          {auditResults.paymentImbalances.map((d: any, idx: number) => (
+                                            <p key={idx}>فاتورة #{d.invoiceNumber}: الفاتورة ({d.amountPaidOnInvoice}) ↔ المقبوض بالصندوق ({d.amountInLedger})</p>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="p-4 bg-black/40 rounded-2xl border border-white/5 space-y-3">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-bold text-sm text-white">السجلات اليتيمة والتالفة</span>
+                                        {(auditResults.orphanedItems.length > 0 || auditResults.emptyInvoices.length > 0) ? (
+                                          <span className="px-2.5 py-1 bg-amber-500/10 text-amber-400 rounded-lg text-[10px] font-black">تباينات مكتشفة</span>
+                                        ) : (
+                                          <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-[10px] font-black">سليم</span>
+                                        )}
+                                      </div>
+                                      <div className="text-xs space-y-1 text-gray-400 text-right">
+                                        <p>قطع غيار صيانة يتيمة بلا فواتير رئيسية: <strong className="text-white font-mono">{auditResults.orphanedItems.length}</strong></p>
+                                        <p>فواتير فارغة كلياً بلا أجهزة مسجلة: <strong className="text-white font-mono">{auditResults.emptyInvoices.length}</strong></p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-center py-12 text-gray-500 select-none">
+                                   يرجى النقر فوق "تحديث الفحص" لبدء مراجعة قواعد البيانات والعمليات المتراكمة وتحقيق السلامة.
+                                </div>
+                              )}
+                            </section>
+                          )}
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+

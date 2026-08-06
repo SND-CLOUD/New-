@@ -1,0 +1,613 @@
+{
+  "entities": {
+    "Customer": {
+      "title": "Customer",
+      "description": "System customers",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Customer name"
+        },
+        "phone1": {
+          "type": "string",
+          "description": "Primary phone"
+        },
+        "phone2": {
+          "type": "string",
+          "description": "Secondary phone"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Customer notes"
+        },
+        "customerNumber": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "name",
+        "phone1"
+      ]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Maintenance invoices",
+      "type": "object",
+      "properties": {
+        "invoiceNumber": {
+          "type": "string"
+        },
+        "customerId": {
+          "type": "string"
+        },
+        "customerName": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "totalCost": {
+          "type": "number"
+        },
+        "amountPaid": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "invoiceNumber",
+        "customerId",
+        "currency"
+      ]
+    },
+    "InvoiceItem": {
+      "title": "Invoice Item",
+      "description": "Devices within an invoice",
+      "type": "object",
+      "properties": {
+        "invoiceId": {
+          "type": "string"
+        },
+        "deviceId": {
+          "type": "string"
+        },
+        "categoryId": {
+          "type": "string"
+        },
+        "invoiceNumber": {
+          "type": "string"
+        },
+        "customerName": {
+          "type": "string"
+        },
+        "deviceType": {
+          "type": "string"
+        },
+        "deviceName": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "number"
+        },
+        "faultType": {
+          "type": "string"
+        },
+        "deviceNotes": {
+          "type": "string"
+        },
+        "technicalNotes": {
+          "type": "string"
+        },
+        "cost": {
+          "type": "number"
+        },
+        "unitCost": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string"
+        },
+        "customerProblem": {
+          "type": "string"
+        },
+        "engineerReport": {
+          "type": "string"
+        },
+        "failureReason": {
+          "type": "string"
+        },
+        "technician": {
+          "type": "string"
+        },
+        "createdBy": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "deliveredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "recipientName": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "invoiceId",
+        "deviceType",
+        "faultType",
+        "cost",
+        "status"
+      ]
+    },
+    "Currency": {
+      "title": "Currency",
+      "description": "App currencies",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "symbol": {
+          "type": "string"
+        },
+        "isDefault": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "name"
+      ]
+    },
+    "DeviceType": {
+      "title": "Device Type",
+      "description": "Types of devices (Router, etc)",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "DeviceCategory": {
+      "title": "Device Category",
+      "description": "Categories of devices",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "DeviceModel": {
+      "title": "Device Model",
+      "description": "Models of devices",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "categoryId": {
+          "type": "string"
+        },
+        "categoryName": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Global app settings",
+      "type": "object",
+      "properties": {
+        "lastInvoiceNumber": {
+          "type": "number"
+        },
+        "isSetupComplete": {
+          "type": "boolean"
+        }
+      }
+    },
+    "User": {
+      "title": "User",
+      "description": "System users",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "isPrimary": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ]
+    },
+    "ShopConfig": {
+      "title": "Shop Config",
+      "description": "Shop identity and settings",
+      "type": "object",
+      "properties": {
+        "shopName": {
+          "type": "string"
+        },
+        "fiscalYear": {
+          "type": "string"
+        },
+        "logoUrl": {
+          "type": "string"
+        },
+        "startDate": {
+          "type": "string"
+        }
+      }
+    },
+    "VaultTransaction": {
+      "title": "Vault Transaction",
+      "description": "Records of money entering or leaving the safe",
+      "type": "object",
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "customerName": {
+          "type": "string"
+        },
+        "invoiceNumber": {
+          "type": "string"
+        },
+        "userName": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "type": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "currency",
+        "amount",
+        "invoiceNumber",
+        "userName",
+        "userId",
+        "timestamp"
+      ]
+    },
+    "CompanyDetails": {
+      "title": "Company Details",
+      "description": "Company and bank details",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "shopName": {
+          "type": "string"
+        },
+        "countryCode": {
+          "type": "string"
+        },
+        "phone1": {
+          "type": "string"
+        },
+        "phone2": {
+          "type": "string"
+        },
+        "landline": {
+          "type": "string"
+        },
+        "phone1Call": {
+          "type": "boolean"
+        },
+        "phone1Whatsapp": {
+          "type": "boolean"
+        },
+        "phone2Call": {
+          "type": "boolean"
+        },
+        "phone2Whatsapp": {
+          "type": "boolean"
+        },
+        "landlineCall": {
+          "type": "boolean"
+        },
+        "landlineWhatsapp": {
+          "type": "boolean"
+        },
+        "facebookUrl": {
+          "type": "string"
+        },
+        "mapUrl": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "bio": {
+          "type": "string"
+        },
+        "logoUrl": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string"
+        },
+        "bankYerName": {
+          "type": "string"
+        },
+        "bankYerAccount": {
+          "type": "string"
+        },
+        "bankSarName": {
+          "type": "string"
+        },
+        "bankSarAccount": {
+          "type": "string"
+        },
+        "bankUsdName": {
+          "type": "string"
+        },
+        "bankUsdAccount": {
+          "type": "string"
+        },
+        "bankHolderName": {
+          "type": "string"
+        },
+        "fiscalYear": {
+          "type": "string"
+        },
+        "startDate": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      }
+    },
+    "ApprovalAction": {
+      "title": "Approval Action",
+      "description": "Approval actions for maintenance items",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "invoiceId": {
+          "type": "string"
+        },
+        "itemId": {
+          "type": "string"
+        }
+      }
+    },
+    "MaintenanceAction": {
+      "title": "Maintenance Action",
+      "description": "Log of actions taken on a device during maintenance",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "invoiceId": {
+          "type": "string"
+        },
+        "itemId": {
+          "type": "string"
+        }
+      }
+    },
+    "Engineer": {
+      "title": "Engineer",
+      "description": "Engineers working on maintenance",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "DocumentOutput": {
+      "title": "Document Output",
+      "description": "Printed document outputs",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      }
+    },
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "Items in the inventory",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "number"
+        },
+        "minQuantity": {
+          "type": "number"
+        },
+        "category": {
+          "type": "string"
+        },
+        "price": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      }
+    },
+    "UserDevice": {
+      "title": "User Device",
+      "description": "System user device records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "deviceNumber": { "type": "number" },
+        "serialImei": { "type": "string" },
+        "deviceName": { "type": "string" },
+        "linkedUserName": { "type": "string" },
+        "linkedUserId": { "type": "string" },
+        "status": { "type": "string" },
+        "networkStatus": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "lastLogin": { "type": "string" },
+        "lastLogout": { "type": "string" },
+        "blockDate": { "type": "string" },
+        "createdByUserId": { "type": "string" },
+        "createdByUserName": { "type": "string" },
+        "notes": { "type": "string" },
+        "isFrozen": { "type": "boolean" }
+      },
+      "required": ["serialImei", "deviceName", "linkedUserName"]
+    }
+  },
+  "firestore": {
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Customer records"
+    },
+    "/invoices/{invoiceId}": {
+      "schema": "Invoice",
+      "description": "Invoice records"
+    },
+    "/invoice_items/{itemId}": {
+      "schema": "InvoiceItem",
+      "description": "Individual items/devices in invoices"
+    },
+    "/inventory_items/{itemId}": {
+      "schema": "InventoryItem",
+      "description": "Inventory items records"
+    },
+    "/currencies/{currencyId}": {
+      "schema": "Currency",
+      "description": "Supported currencies"
+    },
+    "/device_types/{typeId}": {
+      "schema": "DeviceType",
+      "description": "Supported device types"
+    },
+    "/device_categories/{categoryId}": {
+      "schema": "DeviceCategory",
+      "description": "Device Categories"
+    },
+    "/device_models/{modelId}": {
+      "schema": "DeviceModel",
+      "description": "Device Models"
+    },
+    "/settings/app": {
+      "schema": "Settings",
+      "description": "App-wide settings"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "System users"
+    },
+    "/settings/shop": {
+      "schema": "ShopConfig",
+      "description": "Shop configuration"
+    },
+    "/vault_transactions/{transactionId}": {
+      "schema": "VaultTransaction",
+      "description": "Records of the safe/vault activity"
+    },
+    "/company_details/{docId}": {
+      "schema": "CompanyDetails",
+      "description": "Company details information"
+    },
+    "/approval_actions/{docId}": {
+      "schema": "ApprovalAction",
+      "description": "Approval actions for maintenance items"
+    },
+    "/maintenance_actions/{actionId}": {
+      "schema": "MaintenanceAction",
+      "description": "Maintenance action logs"
+    },
+    "/engineers/{engineerId}": {
+      "schema": "Engineer",
+      "description": "Engineer records"
+    },
+    "/user_devices/{deviceId}": {
+      "schema": "UserDevice",
+      "description": "System user devices"
+    },
+    "/document_outputs/{id}": {
+      "schema": "DocumentOutput",
+      "description": "Printed document outputs"
+    }
+  }
+}
