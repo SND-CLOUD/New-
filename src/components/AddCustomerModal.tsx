@@ -85,11 +85,18 @@ export default function AddCustomerModal({
     try {
       const nextNum = Math.max(0, ...customers.map(c => Number(c.customerNumber) || 0)) + 1;
       const settingsRef = doc(db, 'settings', 'app');
-      const settingsDoc = await getDoc(settingsRef);
       let sysNextNum = nextNum;
-      if (settingsDoc.exists()) {
-        const lastCustNum = Number(settingsDoc.data()?.lastCustomerNumber) || 0;
-        sysNextNum = Math.max(nextNum, lastCustNum + 1);
+      try {
+        const settingsDoc = await Promise.race([
+          getDoc(settingsRef),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+        ]) as any;
+        if (settingsDoc && settingsDoc.exists && settingsDoc.exists()) {
+          const lastCustNum = Number(settingsDoc.data()?.lastCustomerNumber) || 0;
+          sysNextNum = Math.max(nextNum, lastCustNum + 1);
+        }
+      } catch (err) {
+        console.warn("getDoc settingsRef timed out in AddCustomerModal:", err);
       }
 
       const batch = writeBatch(db);

@@ -5,6 +5,7 @@ import { Save, RefreshCw, Smartphone, Database, Languages, LogOut, Shield, Finge
 import { localDb } from '../lib/local-db';
 import { FirebaseProviderInstance } from '../data/FirebaseProvider';
 import { LocalProviderInstance } from '../data/LocalProvider';
+import { ProviderFactory } from '../data/ProviderFactory';
 import { User, ShopConfig } from '../types';
 import UserManagement from './UserManagement';
 import EngineersTable from './EngineersTable';
@@ -248,8 +249,21 @@ export default function Settings({ user, shopConfig, onShopConfigUpdate, onSignO
       }
       setDeviceUUID(uuid);
 
-      const s = await getDoc(doc(db, 'settings', 'app'));
-      const data = s.data();
+      let data: any = null;
+      try {
+        const provider = ProviderFactory.getProvider();
+        const s = await Promise.race([
+          provider.getDoc('settings', 'app'),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+        ]) as any;
+        if (s && typeof s.data === 'function') {
+          data = s.data();
+        } else if (s && s.data) {
+          data = s.data;
+        }
+      } catch (err) {
+        console.warn("Could not fetch settings/app baseline:", err);
+      }
       setInvoiceCounter(data?.lastInvoiceNumber || 0);
       setCustomerCounter(data?.lastCustomerNumber || 0);
       
@@ -703,8 +717,21 @@ export default function Settings({ user, shopConfig, onShopConfigUpdate, onSignO
         });
       }
 
-      const settingsDoc = await getDoc(doc(db, 'settings', 'app'));
-      const settingsData = settingsDoc.data();
+      let settingsData: any = null;
+      try {
+        const provider = ProviderFactory.getProvider();
+        const settingsDoc = await Promise.race([
+          provider.getDoc('settings', 'app'),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+        ]) as any;
+        if (settingsDoc && typeof settingsDoc.data === 'function') {
+          settingsData = settingsDoc.data();
+        } else if (settingsDoc && settingsDoc.data) {
+          settingsData = settingsDoc.data;
+        }
+      } catch (err) {
+        console.warn("Could not fetch settings/app in audit:", err);
+      }
       const registeredLastInvoice = Number(settingsData?.lastInvoiceNumber) || 0;
       const registeredLastOtherInvoice = Number(settingsData?.lastOtherInvoiceNumber) || 0;
       const registeredLastCustomer = Number(settingsData?.lastCustomerNumber) || 0;
@@ -3074,8 +3101,8 @@ export default function Settings({ user, shopConfig, onShopConfigUpdate, onSignO
                                   console.error(e);
                                   alert("خطأ أثناء حفظ تفاصيل المحل: " + e.message);
                                 } finally {
-                                  if (typeof SE !== "undefined" && SE) SE.resumeSync();
-      setSaving(false);
+                                  try { const { SyncEngine } = await import("../data/SyncEngine"); SyncEngine.resumeSync(); } catch(e){}
+                                  setSaving(false);
                                 }
                               }}
                               disabled={!isEditingShop || saving}

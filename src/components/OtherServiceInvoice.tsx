@@ -262,8 +262,11 @@ export default function OtherServiceInvoice({ type, onBack, shopConfig, user }: 
       // Robust max invoice number calculation for O- prefix
       let maxOtherNum = 0;
       try {
-        const settingsDoc = await getDoc(doc(db, 'settings', 'app'));
-        if (settingsDoc.exists() && settingsDoc.data().lastOtherInvoiceNumber) {
+        const settingsDoc = await Promise.race([
+          getDoc(doc(db, 'settings', 'app')),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+        ]) as any;
+        if (settingsDoc && settingsDoc.exists && settingsDoc.exists() && settingsDoc.data().lastOtherInvoiceNumber) {
           maxOtherNum = Number(settingsDoc.data().lastOtherInvoiceNumber) || 0;
         }
       } catch (e) {

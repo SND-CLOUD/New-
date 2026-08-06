@@ -111,8 +111,11 @@ export default function DeviceEntry({ onBack, user }: { onBack: () => void, user
       last = Number(settingsData.lastInvoiceNumber) || 0;
     } else {
       try {
-        const docSnap = await getDoc(doc(db, 'settings', 'app'));
-        if (docSnap.exists()) {
+        const docSnap = await Promise.race([
+          getDoc(doc(db, 'settings', 'app')),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+        ]) as any;
+        if (docSnap && docSnap.exists && docSnap.exists()) {
           last = Number(docSnap.data()?.lastInvoiceNumber) || 0;
         }
       } catch (err) {
@@ -310,10 +313,18 @@ export default function DeviceEntry({ onBack, user }: { onBack: () => void, user
 
     try {
       const settingsRef = doc(db, 'settings', 'app');
-      const settingsDoc = await getDoc(settingsRef);
+      let settingsDoc: any = null;
+      try {
+        settingsDoc = await Promise.race([
+          getDoc(settingsRef),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+        ]);
+      } catch (err) {
+        console.warn("getDoc settingsRef timed out:", err);
+      }
       
       let lastInvoiceNumber = 0;
-      if (settingsDoc.exists()) {
+      if (settingsDoc && settingsDoc.exists && settingsDoc.exists()) {
         lastInvoiceNumber = Number(settingsDoc.data()?.lastInvoiceNumber) || 0;
       }
       
