@@ -11,7 +11,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -19,11 +20,12 @@ jobs:
           node-version: 22
           cache: 'npm'
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - name: Setup Java JDK
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
+          cache: 'gradle'
 
       - name: Install dependencies
         run: npm install
@@ -34,12 +36,16 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
       - name: Build Android App (APK)
         run: |
           cd android
           sed -i 's/\r$//' gradlew
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
