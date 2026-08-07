@@ -5,6 +5,8 @@ import { Save, RefreshCw, Smartphone, Database, Languages, LogOut, Shield, Finge
 import { localDb } from '../lib/local-db';
 import { FirebaseProviderInstance } from '../data/FirebaseProvider';
 import { LocalProviderInstance } from '../data/LocalProvider';
+import { ProviderFactory } from '../data/ProviderFactory';
+import { SyncEngine } from '../data/SyncEngine';
 import { User, ShopConfig } from '../types';
 import UserManagement from './UserManagement';
 import EngineersTable from './EngineersTable';
@@ -1283,6 +1285,7 @@ export default function Settings({ user, shopConfig, onShopConfigUpdate, onSignO
           
           try {
             await localDb.run(`DELETE FROM ${table}`);
+            await localDb.run(`DELETE FROM outbox WHERE tableName = ?`, [table]).catch(() => {});
           } catch (e) {
             console.error(`Error clearing table ${table}`, e);
           }
@@ -1448,6 +1451,7 @@ export default function Settings({ user, shopConfig, onShopConfigUpdate, onSignO
 
           try {
             await localDb.run(`DELETE FROM ${table}`);
+            await localDb.run(`DELETE FROM outbox WHERE tableName = ?`, [table]).catch(() => {});
           } catch (e: any) {
             console.error(`Error clearing SQLite table ${table}:`, e);
             failures.push(`جدول ${table}: ${e.message || e}`);
@@ -3074,8 +3078,8 @@ export default function Settings({ user, shopConfig, onShopConfigUpdate, onSignO
                                   console.error(e);
                                   alert("خطأ أثناء حفظ تفاصيل المحل: " + e.message);
                                 } finally {
-                                  if (typeof SE !== "undefined" && SE) SE.resumeSync();
-      setSaving(false);
+                                  SyncEngine.resumeSync();
+                                  setSaving(false);
                                 }
                               }}
                               disabled={!isEditingShop || saving}

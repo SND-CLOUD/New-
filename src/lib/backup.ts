@@ -128,6 +128,7 @@ export async function restoreBackupData(jsonString: string): Promise<boolean> {
         try {
           if (dbMode === 'LOCAL') {
             await localDb.run(`DELETE FROM ${table}`);
+            await localDb.run(`DELETE FROM outbox WHERE tableName = ?`, [table]).catch(() => {});
           } else {
             const existingSnap = await targetProvider.getDocs(table);
             for (const existingDoc of existingSnap.docs) {
