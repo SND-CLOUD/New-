@@ -2,6 +2,7 @@ import { IDataProvider } from './IDataProvider';
 import { localDb } from '../lib/local-db';
 import { generateUUID } from './utils';
 import { parseDate } from '../lib/dateUtils';
+import { ProviderFactory } from './ProviderFactory';
 
 export class LocalProvider implements IDataProvider {
   async getDoc(collectionName: string, id: string): Promise<any> {
@@ -85,7 +86,7 @@ export class LocalProvider implements IDataProvider {
     payload: any,
     transactionGroupId?: string
   ): Promise<void> {
-    const mode = localStorage.getItem('snd_db_provider_mode') || 'LOCAL';
+    const mode = ProviderFactory.getMode();
     if (mode !== 'AUTO' || transactionGroupId === 'BYPASS_OUTBOX') return;
 
     const outboxId = 'out-' + generateUUID();

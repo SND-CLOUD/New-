@@ -1,6 +1,7 @@
 import { localDb } from '../lib/local-db';
 import { LocalProviderInstance } from './LocalProvider';
 import { FirebaseProviderInstance } from './FirebaseProvider';
+import { ProviderFactory } from './ProviderFactory';
 
 function isPermissionError(err: any): boolean {
   if (!err) return false;
@@ -58,7 +59,7 @@ export class SyncEngine {
 
   static async acquireGlobalLock(reason: string = 'OPERATION'): Promise<boolean> {
     this.pauseSync();
-    const mode = localStorage.getItem('snd_db_provider_mode') || 'AUTO';
+    const mode = ProviderFactory.getMode();
     if (mode === 'LOCAL') return true;
 
     try {
@@ -80,7 +81,7 @@ export class SyncEngine {
 
   static async releaseGlobalLock(): Promise<void> {
     this.resumeSync();
-    const mode = localStorage.getItem('snd_db_provider_mode') || 'AUTO';
+    const mode = ProviderFactory.getMode();
     if (mode === 'LOCAL') return;
 
     try {
@@ -99,7 +100,7 @@ export class SyncEngine {
   }
 
   static startCloudLockListener() {
-    const mode = localStorage.getItem('snd_db_provider_mode') || 'AUTO';
+    const mode = ProviderFactory.getMode();
     if (mode === 'LOCAL') return;
     if (this.lockUnsub) return;
 
@@ -141,7 +142,7 @@ export class SyncEngine {
   }
 
   static startCloudListener() {
-    const mode = localStorage.getItem('snd_db_provider_mode') || 'AUTO';
+    const mode = ProviderFactory.getMode();
     if (mode !== 'AUTO') return;
 
     this.startCloudLockListener();
